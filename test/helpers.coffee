@@ -5,27 +5,20 @@ querystring = require 'querystring'
 responseWrapper = exports.responseWrapper = (handler, encoding) ->
   (response) ->
     data = []
-    response.setEncoding encoding if encoding?
     response.on 'error', (e) -> handler e
     response.on 'data', (chunk) -> data.push chunk
     response.on 'end', () ->
       concatenateData = ->
-        body = ''
-        if encoding?
-          # Concatenate textual data
-          for chunk in data
-            body += chunk
-        else
-          # Copy data into buffer
-          totalLength = 0
-          for chunk in data
-            totalLength += chunk.length
-          body = new Buffer(totalLength)
-          offset = 0
-          for chunk in data
-            chunk.copy(body, offset)
-            offset += chunk.length
-        body
+        # Copy data into buffer
+        totalLength = 0
+        for chunk in data
+          totalLength += chunk.length
+        body = new Buffer(totalLength)
+        offset = 0
+        for chunk in data
+          chunk.copy(body, offset)
+          offset += chunk.length
+        return if encoding? then body.toString(encoding) else body
       result =
         headers: response.headers
         statusCode: response.statusCode,
