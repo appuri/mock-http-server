@@ -197,7 +197,8 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
   # Check if all servers have started
   #
   .addBatch
-    'The HTTP Server': testHTTPRunning "ERROR: mock-http-server-test could not create Target HTTP server", HTTPPORT
+    'The Target HTTP Server': testHTTPRunning "ERROR: could not connect to Target HTTP Server", HTTPPORT
+    'The Recording Proxy Server': testHTTPRunning "ERROR: could not connect to Recording Proxy Server", PROXYPORT
 
   #
   # Verify that the Target HTTP Server (running on HTTPPORT) returns known data
@@ -207,8 +208,19 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
     'Getting text from an API from the target server': testGETText HTTPPORT
     'Getting JSON from an API from the target server': testGETJSON HTTPPORT
     'Getting large binary data from the target server': testGETImage HTTPPORT
-    'Posting to an unknown page on the targetServer': testPOSTUnknown HTTPPORT
-    'Posting JSON to an API on the targetServer': testPOSTJSON HTTPPORT
+    'Posting to an unknown page on the target server': testPOSTUnknown HTTPPORT
+    'Posting JSON to an API on the target server': testPOSTJSON HTTPPORT
+
+  #
+  # Verify that the Target HTTP Server (running on HTTPPORT) returns known data
+  #
+  .addBatch
+    'Getting an unknown page from the recording proxy': testGETUnknown PROXYPORT
+    'Getting text from an API from the recording proxy': testGETText PROXYPORT
+    'Getting JSON from an API from the recording proxy': testGETJSON PROXYPORT
+    'Getting large binary data from the recording proxy': testGETImage PROXYPORT
+    'Posting to an unknown page on the recording proxy': testPOSTUnknown PROXYPORT
+    'Posting JSON to an API on the recording proxy': testPOSTJSON PROXYPORT
 
   .export(module)
 
