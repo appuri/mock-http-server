@@ -64,3 +64,12 @@ requestOptions = exports.requestOptions = (host, port, path = '/', method = 'GET
       'Content-Type': contentType
       'Content-Length': 0
   options
+
+postOptions = (options, body) ->
+  options.headers['Content-Length'] = body.length
+  {options, body}  
+
+postJSONOptions = exports.postJSONOptions = (host, port, path = '/', params) ->
+  options = requestOptions host, port, path, 'POST'
+  body = if params? then JSON.stringify params else ''
+  postOptions options, body
