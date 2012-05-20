@@ -89,8 +89,9 @@ http.createServer((req, res) ->
 
 recordingProxyOptions =
   port: PROXYPORT
-  targetHost: HOSTNAME
-  targetPort: HTTPPORT
+  target: 
+    host: HOSTNAME
+    port: HTTPPORT
 createRecordingProxyServer recordingProxyOptions
 
 #
@@ -98,14 +99,15 @@ createRecordingProxyServer recordingProxyOptions
 #
 
 getRawRequest = (port, path, callback, encoding) ->
-  http.request(requestOptions(HOSTNAME, port, path), responseWrapper(callback, encoding)).end()
+  options = requestOptions(HOSTNAME, port, path)
+  http.request(options, responseWrapper(callback, encoding)).end()
   return
 
 getRequest = (port, path, callback) -> getRawRequest(port, path, callback, 'utf8')
 getImageRequest = (port, path, callback) -> getRawRequest(port, path, callback)
 
-postRequest = (path, params, callback) ->
-  {options, body} = postJSONOptions HOSTNAME, HTTPPORT, path, params
+postRequest = (port, path, params, callback) ->
+  {options, body} = postJSONOptions HOSTNAME, port, path, params
   req = http.request options, responseWrapper(callback, 'utf8')
   req.write body
   req.end()
@@ -120,7 +122,7 @@ postRequest = (path, params, callback) ->
 testGETUnknown = (port) ->
   return {
     topic: ->
-      getRequest port, '/does-not-exit', @callback
+      getRequest port, '/does-not-exist', @callback
     'should not have errors': (error, results) ->
       assert.isNull error
     'should respond with HTTP 404': (results) ->
@@ -142,7 +144,7 @@ testGETText = (port) ->
 testGETJSON = (port) ->
   return {
     topic: ->
-      getRequest HTTPPORT, '/jsontest', @callback
+      getRequest port, '/jsontest', @callback
     'should not have errors': (error, results) ->
       assert.isNull error
     'should respond with HTTP 200 and have JSON data': (results) ->
@@ -154,7 +156,7 @@ testGETJSON = (port) ->
 testGETImage = (port) ->
   return {
     topic: ->
-      getImageRequest HTTPPORT, '/imagetest', @callback
+      getImageRequest port, '/imagetest', @callback
     'should not have errors': (error, results) ->
       assert.isNull error
     'should respond with HTTP 200 and have image data': (results) ->
@@ -168,7 +170,7 @@ testGETImage = (port) ->
 testPOSTUnknown = (port) ->
   return {
     topic: ->
-      postRequest '/does-not-exit', {}, @callback
+      postRequest port, '/does-not-exist', {}, @callback
     'should not have errors': (error, results) ->
       assert.isNull error
     'should respond with HTTP 404': (results) ->
@@ -178,7 +180,7 @@ testPOSTUnknown = (port) ->
 testPOSTJSON = (port) ->
   return {
     topic: ->
-      postRequest '/posttest', { test: 'posttest' }, @callback
+      postRequest port, '/posttest', { test: 'posttest' }, @callback
     'should not have errors': (error, results) ->
       assert.isNull error
     'should respond with HTTP 200': (results) ->
@@ -198,6 +200,7 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
   #
   .addBatch
     'The Target HTTP Server': testHTTPRunning "ERROR: could not connect to Target HTTP Server", HTTPPORT
+  .addBatch
     'The Recording Proxy Server': testHTTPRunning "ERROR: could not connect to Recording Proxy Server", PROXYPORT
 
   #
@@ -212,7 +215,7 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
     'Posting JSON to an API on the target server': testPOSTJSON HTTPPORT
 
   #
-  # Verify that the Target HTTP Server (running on HTTPPORT) returns known data
+  # Verify that the Recording Proxy (running PROXYPORT) passes through the requests to the Target HTTP Server
   #
   .addBatch
     'Getting an unknown page from the recording proxy': testGETUnknown PROXYPORT
