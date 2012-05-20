@@ -2,19 +2,38 @@ http        = require 'http'
 assert      = require 'assert'
 querystring = require 'querystring'
 
-responseWrapper = exports.responseWrapper = (handler) ->
+responseWrapper = exports.responseWrapper = (handler, encoding) ->
   (response) ->
-    response.body = ''
+    data = []
+    response.setEncoding encoding if encoding?
     response.on 'error', (e) -> handler e
-    response.on 'data', (chunk) -> response.body += chunk
+    response.on 'data', (chunk) -> data.push chunk
     response.on 'end', () ->
+      concatenateData = ->
+        body = ''
+        if encoding?
+          # Concatenate textual data
+          for chunk in data
+            body += chunk
+        else
+          # Copy data into buffer
+          totalLength = 0
+          for chunk in data
+            totalLength += chunk.length
+          body = new Buffer(totalLength)
+          offset = 0
+          for chunk in data
+            chunk.copy(body, offset)
+            offset += chunk.length
+        body
       result =
         headers: response.headers
         statusCode: response.statusCode,
-        body: response.body
+        body: concatenateData()
       handler null, result
 
-testHTTPRunning = exports.testHTTPRunning = (message, port=80, hostname='localhost') -> {
+testHTTPRunning = exports.testHTTPRunning = (message, port=80, hostname='localhost') ->
+  {
     topic: ->
       callback = @callback
       client = http.createClient port, hostname
