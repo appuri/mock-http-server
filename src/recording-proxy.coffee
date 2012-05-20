@@ -1,6 +1,8 @@
-events  = require 'events'
-http    = require 'http'
-mock    = require '../lib/mock-http-server'
+events      = require 'events'
+http        = require 'http'
+crypto      = require 'crypto'
+querystring = require 'querystring'
+mock        = require '../lib/mock-http-server'
 
 exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
   constructor: (options = {}) ->
@@ -79,6 +81,7 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
           reverseProxy.removeListener "error", proxyError
           try
             res.end()
+            console.log ">>> recording-proxy.coffee:84 ENDED", req.filename
           catch ex
             console.error "res.end error: %s", ex.message
           self.emit "end", req, res
@@ -108,8 +111,10 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
 
     req.on "data", (chunk) ->
       unless errState
+        req.bodyHash ||= crypto.createHash 'sha1'
+        req.bodyHash.update chunk
         flushed = reverseProxy.write(chunk)
-        unless flushed
+        if not flushed
           req.pause()
           reverseProxy.once "drain", ->
             try
@@ -119,6 +124,7 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
           setTimeout (-> reverseProxy.emit "drain"), 100
 
     req.on "end", ->
+      req.filename = mock._generateFilename(req.method, req.url, req.bodyHash?.digest('hex'))
       reverseProxy.end() unless errState
 
     req.on "close", ->

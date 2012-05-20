@@ -1,6 +1,7 @@
-http    = require 'http'
-https   = require 'https'
-proxy   = require '../lib/recording-proxy'
+http          = require 'http'
+https         = require 'https'
+querystring   = require 'querystring'
+proxy         = require '../lib/recording-proxy'
 
 maxSockets = 100
 
@@ -31,6 +32,19 @@ exports._getBase = (options) ->
     for key in [ "ca", "cert", "key" ]
       result::[key] = options.https[key] if options.https[key]
   result
+
+exports._generateFilename = (method, url, hash) ->
+  # Start with the method name
+  filename = method
+  # Followed by the path with dangerous characters stripped
+  filename += querystring.escape(url.replace(/[\/.:\\?&\[\]'"= ]+/g, '-'))
+  # Append the hash of the body
+  if hash
+    filename += '-'
+    filename += hash
+  filename
+
+
 
 ###
 
