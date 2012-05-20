@@ -3,14 +3,18 @@ assert    = require 'assert'
 http      = require 'http'
 {_}       = require 'underscore'
 helpers   = require '../lib/helpers'
+mock      = require '../lib/mock-http-server'
 
 {responseWrapper, testHTTPRunning, requestOptions, postJSONOptions} = helpers
+{createRecordingProxyServer} = mock
 
 HOSTNAME      = '127.0.0.1'
-HTTPPORT      = 7771
+HTTPPORT      = 7771  # Target HTTP server
+PROXYPORT     = 7772  # Recording Proxy Server
+REPLAYPORT    = 7773  # Playback HTTP server
 
 #
-# Binary data used for testing
+# Binary data used for testing large HTTP response bodies
 #
 
 createBinaryImageData = ->
@@ -22,14 +26,18 @@ createBinaryImageData = ->
     i++
   data
 
-testImageData = createBinaryImageData()
+TEST_IMAGE_DATA = createBinaryImageData()
 
 #
-# Simple HTTP Server used for testing the proxy
+# A simple HTTP server that is used as the target
+# for the recording proxy
 #
-unknownRequest = (res) -> res.writeHead 404
+# Note: Add new test APIs to this server
+#
 
-verifyGetRequest = (req, res) ->
+writeUnknownRequest = (res) -> res.writeHead 404
+
+respondToGETRequest = (req, res) ->
   switch req.url
     when '/'
       res.writeHead 200, "Content-Type": "text/plain"
@@ -41,12 +49,12 @@ verifyGetRequest = (req, res) ->
       res.write JSON.stringify({ jsontest: true })
     when '/imagetest'
       res.writeHead 200, "Content-Type": "image/png"
-      res.write testImageData
+      res.write TEST_IMAGE_DATA
     else
-      unknownRequest res
+      writeUnknownRequest res
   res.end()
 
-verifyPostRequest = (req, res) ->
+respondToPOSTRequest = (req, res) ->
   switch req.url
     when '/posttest'
       body = JSON.parse(req.body)
@@ -56,34 +64,45 @@ verifyPostRequest = (req, res) ->
       else
         res.writeHead 422, "Unprocessable Entity", "Content-Type": "text/plain"
     else
-      unknownRequest res
+      writeUnknownRequest res
   res.end()
 
 http.createServer((req, res) ->
   switch req.method
     when 'GET'
       # Respond immediately
-      verifyGetRequest(req, res)
+      respondToGETRequest(req, res)
     when 'POST'
       # Collect the body
       req.body = ''
       req.on 'data', (chunk) -> req.body += chunk
-      req.on 'end', -> verifyPostRequest(req, res)
+      req.on 'end', -> respondToPOSTRequest(req, res)
     else
-      unknownRequest res
+      writeUnknownRequest res
       res.end()
 ).listen HTTPPORT, HOSTNAME
+
+#
+# Recording Proxy Server
+# Captures requests to Target HTTP Server (above)
+#
+
+recordingProxyOptions =
+  port: PROXYPORT
+  targetHost: HOSTNAME
+  targetPort: HTTPPORT
+createRecordingProxyServer recordingProxyOptions
 
 #
 # Test Macros
 #
 
-getRawRequest = (path, callback, encoding) ->
-  http.request(requestOptions(HOSTNAME, HTTPPORT, path), responseWrapper(callback, encoding)).end()
+getRawRequest = (port, path, callback, encoding) ->
+  http.request(requestOptions(HOSTNAME, port, path), responseWrapper(callback, encoding)).end()
   return
 
-getRequest = (path, callback) -> getRawRequest(path, callback, 'utf8')
-getImageRequest = (path, callback) -> getRawRequest(path, callback)
+getRequest = (port, path, callback) -> getRawRequest(port, path, callback, 'utf8')
+getImageRequest = (port, path, callback) -> getRawRequest(port, path, callback)
 
 postRequest = (path, params, callback) ->
   {options, body} = postJSONOptions HOSTNAME, HTTPPORT, path, params
@@ -93,73 +112,103 @@ postRequest = (path, params, callback) ->
   return
 
 #
+# Parameterized tests
+# We run the same tests on different ports to make sure that the proxy
+# and playback return the original results from the target server
+#
+
+testGETUnknown = (port) ->
+  return {
+    topic: ->
+      getRequest port, '/does-not-exit', @callback
+    'should not have errors': (error, results) ->
+      assert.isNull error
+    'should respond with HTTP 404': (results) ->
+      assert.equal results.statusCode, 404    
+  }
+
+testGETText = (port) ->
+  return {
+    topic: ->
+      getRequest port, '/texttest', @callback
+    'should not have errors': (error, results) ->
+      assert.isNull error
+    'should respond with HTTP 200 and have text data': (results) ->
+      assert.equal results.statusCode, 200
+      assert.equal results.headers['content-type'], "text/plain"
+      assert.equal results.body, 'texttest'    
+  }
+
+testGETJSON = (port) ->
+  return {
+    topic: ->
+      getRequest HTTPPORT, '/jsontest', @callback
+    'should not have errors': (error, results) ->
+      assert.isNull error
+    'should respond with HTTP 200 and have JSON data': (results) ->
+      assert.equal results.statusCode, 200
+      assert.equal results.headers['content-type'], "application/json"
+      assert.deepEqual JSON.parse(results.body), { jsontest: true }
+  }
+
+testGETImage = (port) ->
+  return {
+    topic: ->
+      getImageRequest HTTPPORT, '/imagetest', @callback
+    'should not have errors': (error, results) ->
+      assert.isNull error
+    'should respond with HTTP 200 and have image data': (results) ->
+      assert.equal results.statusCode, 200
+      assert.equal results.headers['content-type'], "image/png"
+    'should have the same binary image sent by the server': (results) ->
+      if results.body.toString('base64') != TEST_IMAGE_DATA.toString('base64')
+        assert.isTrue false, "Image received (#{results.body.length} bytes) is not the same as file (#{TEST_IMAGE_DATA.length} bytes)"
+  }
+
+testPOSTUnknown = (port) ->
+  return {
+    topic: ->
+      postRequest '/does-not-exit', {}, @callback
+    'should not have errors': (error, results) ->
+      assert.isNull error
+    'should respond with HTTP 404': (results) ->
+      assert.equal results.statusCode, 404   
+  }
+
+testPOSTJSON = (port) ->
+  return {
+    topic: ->
+      postRequest '/posttest', { test: 'posttest' }, @callback
+    'should not have errors': (error, results) ->
+      assert.isNull error
+    'should respond with HTTP 200': (results) ->
+      assert.equal results.statusCode, 200
+    'should respond with JSON': (results) ->
+      assert.equal results.headers['content-type'], "application/json"
+      assert.deepEqual JSON.parse(results.body), { posttest: true }    
+  }
+
+#
 # Test Suite
 #
 
 vows.describe('Mock HTTP Server Test (mock-http-server-test)')
+  #
+  # Check if all servers have started
+  #
   .addBatch
-    'The HTTP Server': testHTTPRunning "The test creates the server and it is not running", HTTPPORT
+    'The HTTP Server': testHTTPRunning "ERROR: mock-http-server-test could not create Target HTTP server", HTTPPORT
 
+  #
+  # Verify that the Target HTTP Server (running on HTTPPORT) returns known data
+  #
   .addBatch
-    'Getting an unknown page':
-      topic: ->
-        getRequest '/does-not-exit', @callback
-      'should not have errors': (error, results) ->
-        assert.isNull error
-      'should respond with HTTP 404': (results) ->
-        assert.equal results.statusCode, 404
-
-    'Getting text from an API':
-      topic: ->
-        getRequest '/texttest', @callback
-      'should not have errors': (error, results) ->
-        assert.isNull error
-      'should respond with HTTP 200 and have text data': (results) ->
-        assert.equal results.statusCode, 200
-        assert.equal results.headers['content-type'], "text/plain"
-        assert.equal results.body, 'texttest'
-
-    'Getting JSON from an API':
-      topic: ->
-        getRequest '/jsontest', @callback
-      'should not have errors': (error, results) ->
-        assert.isNull error
-      'should respond with HTTP 200 and have JSON data': (results) ->
-        assert.equal results.statusCode, 200
-        assert.equal results.headers['content-type'], "application/json"
-        assert.deepEqual JSON.parse(results.body), { jsontest: true }
-
-    'Getting large binary data from an API':
-      topic: ->
-        getImageRequest '/imagetest', @callback
-      'should not have errors': (error, results) ->
-        assert.isNull error
-      'should respond with HTTP 200 and have image data': (results) ->
-        assert.equal results.statusCode, 200
-        assert.equal results.headers['content-type'], "image/png"
-      'should have the same binary image sent by the server': (results) ->
-        if results.body.toString('base64') != testImageData.toString('base64')
-          assert.isTrue false, "Image received (#{results.body.length} bytes) is not the same as file (#{testImageData.length} bytes)"
-
-  .addBatch
-    'Posting to an unknown page':
-      topic: ->
-        postRequest '/does-not-exit', {}, @callback
-      'should not have errors': (error, results) ->
-        assert.isNull error
-      'should respond with HTTP 404': (results) ->
-        assert.equal results.statusCode, 404
-
-    'Posting to an API':
-      topic: ->
-        postRequest '/posttest', { test: 'posttest' }, @callback
-      'should not have errors': (error, results) ->
-        assert.isNull error
-      'should respond with HTTP 200': (results) ->
-        assert.equal results.statusCode, 200
-      'should respond with JSON': (results) ->
-        assert.equal results.headers['content-type'], "application/json"
-        assert.deepEqual JSON.parse(results.body), { posttest: true }
+    'Getting an unknown page from the target server': testGETUnknown HTTPPORT
+    'Getting text from an API from the target server': testGETText HTTPPORT
+    'Getting JSON from an API from the target server': testGETJSON HTTPPORT
+    'Getting large binary data from the target server': testGETImage HTTPPORT
+    'Posting to an unknown page on the targetServer': testPOSTUnknown HTTPPORT
+    'Posting JSON to an API on the targetServer': testPOSTJSON HTTPPORT
 
   .export(module)
 
