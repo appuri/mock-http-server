@@ -157,6 +157,9 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.isNull error
       'should respond with HTTP 200': (results) ->
         assert.equal results.statusCode, 200
+      'should respond with JSON': (results) ->
+        assert.equal results.headers['content-type'], "application/json"
+        assert.deepEqual JSON.parse(results.body), { posttest: true }
 
   .export(module)
 
