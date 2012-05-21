@@ -1,4 +1,6 @@
-#!/usr/bin/env node
+# **app.coffee**
+# Script that is used to create `./bin/mock-http-server`.
+#
 
 http    = require 'http'
 url     = require 'url'
@@ -50,9 +52,11 @@ if target?
   console.log "Running in recording mode"
   console.log "  Recording calls to " + target
   options.target = { host: targetHost, port: targetPort }
+  # See recording-proxy.coffee
   createRecordingProxyServer options
 else
   console.log "Running in playback mode"
+  # See playback-server.coffee
   createPlaybackServer options
 
 console.log "  Fixtures directory: ./#{fixtures}"

@@ -1,3 +1,8 @@
+# **recording-proxy.coffee**
+# Proxy request to the target server and store responses in a file
+# specific to the request.
+# 
+
 events      = require 'events'
 http        = require 'http'
 fs          = require 'fs'
@@ -21,37 +26,44 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
     @target.protocol = mock._getProtocol(@target)
     @target.base = mock._getBase(@target)
 
+  # Called once for each request to the HTTP server.
   proxyRequest: (req, res) ->
     self      = @
     outgoing  = new(@target.base)
     errState  = false
 
-    #
-    # Capture data written to res
-    #
+    # Capture data written to res so that when
+    # the response is finished, we can store
+    # the data into the response file.
     res.recording =
       method: req.method
       url: req.url
       data: []
+
+    # Override the writeHead method in order
+    # to save the `statusCode` and `headers`.
     _writeHead = res.writeHead
     res.writeHead = (statusCode, headers) ->
       res.recording.statusCode = statusCode
       res.recording.headers = headers
       _writeHead.apply res, arguments
 
+    # Override the write method in order
+    # to save the response `body`.
     _write = res.write
     res.write = (chunk) ->
       res.recording.data.push chunk.toString('base64')
       _write.apply res, arguments
 
+    # Save recorded data to file.
     writeRecordingToFile = ->
       throw new Error("recording does not have a filename") unless res.recording.filename
       filepath = "#{self.fixturePath}/#{res.recording.filename}"
       recordingJSON = JSON.stringify(res.recording, true, 2)
-      fs.writeFileSync(filepath, recordingJSON)
+      fs.writeFile(filepath, recordingJSON)
 
     #
-    # Outgoing request to target
+    # Outgoing request to target server.
     #
 
     outgoing.host = @target.host
@@ -69,7 +81,7 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
         else
           response.headers.connection = "close"
 
-      # Remove HTTP 1.1 headers
+      # Remove HTTP 1.1 headers for HTTP 1.0
       delete response.headers["transfer-encoding"] if req.httpVersion == "1.0"
 
       # Replace redirect scheme if we are targeting an HTTPS server
@@ -88,6 +100,7 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
 
       # Manage stream events from target response
       ended = false
+
       onData = (chunk) ->
         # Back off if throughput too high
         if res.writable
@@ -101,6 +114,8 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
 
       onClose = -> response.emit 'end' unless ended
 
+      # Close response back to client when response
+      # from target finishes.
       onEnd = ->
         ended = true
         unless errState
@@ -135,6 +150,12 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
 
     req.on "aborted", -> reverseProxy.abort()
 
+    # When receiving data from the client, calculate
+    # the hash of the request body and write the chunk
+    # to the request of the target.
+    # Watch if the pipe to the target is backing up
+    # and pause the client request until target socket
+    # is drained.
     req.on "data", (chunk) ->
       unless errState
         req.bodyHash ||= crypto.createHash 'sha1'
@@ -149,6 +170,7 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
               console.error "req.resume error: %s", er.message
           setTimeout (-> reverseProxy.emit "drain"), 100
 
+    # Calculate filename once the request is finished.
     req.on "end", ->
       res.recording.filename = mock._generateResponseFilename(req.method, req.url, req.bodyHash?.digest('hex'))
       reverseProxy.end() unless errState
@@ -156,6 +178,7 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
     req.on "close", ->
       reverseProxy.abort() unless errState
 
+  # Close all outstanding sockets to target if closed.
   close: ->
     proxy = @target
     if proxy and proxy.agent
