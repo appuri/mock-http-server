@@ -6,12 +6,12 @@ helpers   = require '../lib/helpers'
 mock      = require '../lib/mock-http-server'
 
 {responseWrapper, testHTTPRunning, requestOptions, postJSONOptions} = helpers
-{createRecordingProxyServer} = mock
+{createRecordingProxyServer, createPlaybackServer} = mock
 
 HOSTNAME      = '127.0.0.1'
 HTTPPORT      = 7771  # Target HTTP server
 PROXYPORT     = 7772  # Recording Proxy Server
-REPLAYPORT    = 7773  # Playback HTTP server
+PLAYBACKPORT  = 7773  # Playback HTTP server
 
 #
 # Binary data used for testing large HTTP response bodies
@@ -94,6 +94,16 @@ recordingProxyOptions =
     host: HOSTNAME
     port: HTTPPORT
 createRecordingProxyServer recordingProxyOptions
+
+#
+# Playback Server
+# Loads requests captured by Recording Proxy
+#
+
+playbackServerOptions =
+  port: PLAYBACKPORT
+  fixtures: 'test/fixtures'
+createPlaybackServer playbackServerOptions
 
 #
 # Test Macros
@@ -225,6 +235,17 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
     'Getting large binary data from the recording proxy': testGETImage PROXYPORT
     'Posting to an unknown page on the recording proxy': testPOSTUnknown PROXYPORT
     'Posting JSON to an API on the recording proxy': testPOSTJSON PROXYPORT
+
+  #
+  # Verify that the Playback Server (running on PLAYBACKPORT) loads the recorded responses
+  #
+  .addBatch
+    'Getting an unknown page from the playback server': testGETUnknown PLAYBACKPORT
+    'Getting text from an API from the playback server': testGETText PLAYBACKPORT
+    'Getting JSON from an API from the playback server': testGETJSON PLAYBACKPORT
+    'Getting large binary data from the playback server': testGETImage PLAYBACKPORT
+    'Posting to an unknown page on the playback server': testPOSTUnknown PLAYBACKPORT
+    'Posting JSON to an API on the playback server': testPOSTJSON PLAYBACKPORT
 
   .export(module)
 

@@ -7,7 +7,7 @@ querystring = require 'querystring'
 mock        = require '../lib/mock-http-server'
 
 exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
-  constructor: (options = {}) ->
+  constructor: (@options = {}) ->
     # Set up directory
     fixtureDir = options.fixtures || 'fixtures'
     @fixturePath = "#{__dirname}/../#{fixtureDir}"

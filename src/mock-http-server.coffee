@@ -1,12 +1,13 @@
 http          = require 'http'
 https         = require 'https'
 querystring   = require 'querystring'
-proxy         = require '../lib/recording-proxy'
+recording     = require '../lib/recording-proxy'
+playback      = require '../lib/playback-server'
 
 maxSockets = 100
 
 exports.createRecordingProxyServer = (options) ->
-  recordingProxy = new proxy.RecordingProxy(options)
+  recordingProxy = new recording.RecordingProxy(options)
   handler = (req, res) -> recordingProxy.proxyRequest(req, res)
   server = (if options.https then https.createServer(options.https, handler) else http.createServer(handler))
   server.on "close", -> recordingProxy.close()
@@ -14,8 +15,18 @@ exports.createRecordingProxyServer = (options) ->
   server.listen(options.port)
   server
 
+exports.createPlaybackServer = (options) ->
+  playbackServer = new playback.PlaybackServer(options)
+  handler = (req, res) -> playbackServer.playbackRequest(req, res)
+  server = (if options.https then https.createServer(options.https, handler) else http.createServer(handler))
+  server.on "close", -> playbackServer.close()
+  server.playbackServer = playbackServer
+  server.listen(options.port)
+  server
+
 exports.getMaxSockets = -> maxSockets
 exports.setMaxSockets = (value) -> maxSockets = value
+
 exports._getAgent = (options) ->
   throw new Error("options.host is required to create an Agent.") if not options?.host
   options.port ||= (if options.https then 443 else 80)
