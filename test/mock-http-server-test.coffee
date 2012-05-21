@@ -88,9 +88,9 @@ http.createServer((req, res) ->
 #
 
 recordingProxyOptions =
-  port: PROXYPORT
-  fixtures: 'test/fixtures'
-  target: 
+  port: PROXYPORT             # port to listen on
+  fixtures: 'test/fixtures'   # directory where the fixture files are
+  target:                     # target server to proxy
     host: HOSTNAME
     port: HTTPPORT
 createRecordingProxyServer recordingProxyOptions
@@ -101,8 +101,9 @@ createRecordingProxyServer recordingProxyOptions
 #
 
 playbackServerOptions =
-  port: PLAYBACKPORT
-  fixtures: 'test/fixtures'
+  port: PLAYBACKPORT          # port to listen on
+  fixtures: 'test/fixtures'   # directory where the fixture files are
+  logUnknownRequests: false   # do not show them on screen during testing
 createPlaybackServer playbackServerOptions
 
 #
@@ -134,6 +135,16 @@ testGETUnknown = (port) ->
   return {
     topic: ->
       getRequest port, '/does-not-exist', @callback
+    'should not have errors': (error, results) ->
+      assert.isNull error
+    'should respond with HTTP 404': (results) ->
+      assert.equal results.statusCode, 404    
+  }
+
+testGETUnrecorded = (port) ->
+  return {
+    topic: ->
+      getRequest port, '/was-not-recorded', @callback
     'should not have errors': (error, results) ->
       assert.isNull error
     'should respond with HTTP 404': (results) ->
@@ -246,6 +257,7 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
     'Getting large binary data from the playback server': testGETImage PLAYBACKPORT
     'Posting to an unknown page on the playback server': testPOSTUnknown PLAYBACKPORT
     'Posting JSON to an API on the playback server': testPOSTJSON PLAYBACKPORT
+    'Getting an unrecorded page from the playback server': testGETUnrecorded PLAYBACKPORT
 
   .export(module)
 
