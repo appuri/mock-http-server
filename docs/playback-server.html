@@ -1,0 +1,86 @@
+<!DOCTYPE html>  <html> <head>   <title>playback-server.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <link rel="stylesheet" media="all" href="docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>            <div id="jump_to">         Jump To &hellip;         <div id="jump_wrapper">           <div id="jump_page">                                           <a class="source" href="app.html">                 app.coffee               </a>                                           <a class="source" href="mock-http-server.html">                 mock-http-server.coffee               </a>                                           <a class="source" href="playback-server.html">                 playback-server.coffee               </a>                                           <a class="source" href="recording-proxy.html">                 recording-proxy.coffee               </a>                        </div>         </div>       </div>          <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               playback-server.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre><span class="nv">events      = </span><span class="nx">require</span> <span class="s">&#39;events&#39;</span>
+<span class="nv">http        = </span><span class="nx">require</span> <span class="s">&#39;http&#39;</span>
+<span class="nv">fs          = </span><span class="nx">require</span> <span class="s">&#39;fs&#39;</span>
+<span class="nv">path        = </span><span class="nx">require</span> <span class="s">&#39;path&#39;</span>
+<span class="nv">crypto      = </span><span class="nx">require</span> <span class="s">&#39;crypto&#39;</span>
+<span class="p">{</span><span class="nx">_</span><span class="p">}</span>         <span class="o">=</span> <span class="nx">require</span> <span class="s">&#39;underscore&#39;</span>
+<span class="nv">mock        = </span><span class="nx">require</span> <span class="s">&#39;../lib/mock-http-server&#39;</span>
+
+<span class="nv">exports.PlaybackServer = </span><span class="k">class</span> <span class="nx">PlaybackServer</span> <span class="k">extends</span> <span class="nx">events</span><span class="p">.</span><span class="nx">EventEmitter</span>
+
+  <span class="nv">constructor: </span><span class="nf">(@options = {}) -&gt;</span>
+    <span class="vi">@responses = </span><span class="p">{}</span>
+    <span class="vi">@notfound = </span><span class="p">{}</span>
+    <span class="nv">fixtureDir = </span><span class="nx">options</span><span class="p">.</span><span class="nx">fixtures</span> <span class="o">||</span> <span class="s">&#39;fixtures&#39;</span>
+    <span class="vi">@fixturePath = </span><span class="s">&quot;</span><span class="si">#{</span><span class="nx">__dirname</span><span class="si">}</span><span class="s">/../</span><span class="si">#{</span><span class="nx">fixtureDir</span><span class="si">}</span><span class="s">&quot;</span>
+
+  <span class="nv">playbackRequest: </span><span class="nf">(req, res) -&gt;</span>
+    <span class="nx">req</span><span class="p">.</span><span class="kc">on</span> <span class="s">&quot;data&quot;</span><span class="p">,</span> <span class="nf">(chunk) -&gt;</span>
+      <span class="nx">req</span><span class="p">.</span><span class="nx">bodyHash</span> <span class="o">||=</span> <span class="nx">crypto</span><span class="p">.</span><span class="nx">createHash</span> <span class="s">&#39;sha1&#39;</span>
+      <span class="nx">req</span><span class="p">.</span><span class="nx">bodyHash</span><span class="p">.</span><span class="nx">update</span> <span class="nx">chunk</span>
+
+    <span class="nx">req</span><span class="p">.</span><span class="kc">on</span> <span class="s">&quot;end&quot;</span><span class="p">,</span> <span class="o">=&gt;</span>
+      <span class="nv">filename = </span><span class="nx">mock</span><span class="p">.</span><span class="nx">_generateResponseFilename</span><span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">method</span><span class="p">,</span> <span class="nx">req</span><span class="p">.</span><span class="nx">url</span><span class="p">,</span> <span class="nx">req</span><span class="p">.</span><span class="nx">bodyHash</span><span class="o">?</span><span class="p">.</span><span class="nx">digest</span><span class="p">(</span><span class="s">&#39;hex&#39;</span><span class="p">))</span>
+      <span class="nx">@_playbackResponseFromFilename</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="nx">filename</span>
+
+  <span class="nv">close: </span><span class="o">-&gt;</span> <span class="kc">undefined</span>
+
+
+  <span class="nv">_respondWithNotFound: </span><span class="nf">(req, res, filename) -&gt;</span>
+    <span class="nx">unless</span> <span class="nx">@options</span><span class="p">.</span><span class="nx">hideUnknownRequests</span>
+      <span class="nx">unless</span> <span class="nx">@notfound</span><span class="p">[</span><span class="nx">filename</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nx">_</span><span class="p">.</span><span class="nx">isEmpty</span><span class="p">(</span><span class="nx">@notfound</span><span class="p">)</span>
+          <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&quot;Unrecorded requests:&quot;</span>
+        <span class="nx">@notfound</span><span class="p">[</span><span class="nx">filename</span><span class="p">]</span> <span class="o">=</span> <span class="kc">true</span>
+        <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&quot; </span><span class="si">#{</span><span class="nx">req</span><span class="p">.</span><span class="nx">method</span><span class="si">}</span><span class="s"> </span><span class="si">#{</span><span class="nx">req</span><span class="p">.</span><span class="nx">url</span><span class="si">}</span><span class="s">&quot;</span>
+    <span class="nx">res</span><span class="p">.</span><span class="nx">writeHead</span> <span class="mi">404</span>
+    <span class="nx">res</span><span class="p">.</span><span class="nx">end</span><span class="p">()</span>
+
+  <span class="nv">_playbackRecordedResponse: </span><span class="nf">(req, res, recordedResponse) -&gt;</span>
+    <span class="p">{</span> <span class="nx">statusCode</span><span class="p">,</span> <span class="nx">headers</span><span class="p">,</span> <span class="nx">data</span><span class="p">,</span> <span class="nx">body</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">recordedResponse</span>
+    <span class="k">if</span> <span class="o">not</span> <span class="nx">body</span> <span class="o">and</span> <span class="nx">data</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="mi">0</span> 
+      <span class="nx">debugger</span><span class="p">;</span></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Create body from base64 encoded data chunks</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nv">chunks = </span><span class="p">[]</span>
+      <span class="k">while</span> <span class="o">not</span> <span class="nx">_</span><span class="p">.</span><span class="nx">isEmpty</span><span class="p">(</span><span class="nx">data</span><span class="p">)</span>
+        <span class="nv">base64chunk = </span><span class="nx">data</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+        <span class="nx">chunks</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="k">new</span> <span class="nx">Buffer</span><span class="p">(</span><span class="nx">base64chunk</span><span class="p">,</span> <span class="s">&#39;base64&#39;</span><span class="p">))</span>
+
+      <span class="nv">totalLength = </span><span class="mi">0</span>
+      <span class="k">for</span> <span class="nx">chunk</span> <span class="k">in</span> <span class="nx">chunks</span>
+        <span class="nx">totalLength</span> <span class="o">+=</span> <span class="nx">chunk</span><span class="p">.</span><span class="nx">length</span>
+      <span class="nv">body = </span><span class="k">new</span> <span class="nx">Buffer</span><span class="p">(</span><span class="nx">totalLength</span><span class="p">)</span>
+      <span class="nv">offset = </span><span class="mi">0</span>
+      <span class="k">for</span> <span class="nx">chunk</span> <span class="k">in</span> <span class="nx">chunks</span>
+        <span class="nx">chunk</span><span class="p">.</span><span class="nx">copy</span><span class="p">(</span><span class="nx">body</span><span class="p">,</span> <span class="nx">offset</span><span class="p">)</span>
+        <span class="nx">offset</span> <span class="o">+=</span> <span class="nx">chunk</span><span class="p">.</span><span class="nx">length</span>
+      <span class="nv">recordedResponse.body = </span><span class="nx">body</span>
+
+    <span class="nx">res</span><span class="p">.</span><span class="nx">writeHead</span> <span class="nx">statusCode</span><span class="p">,</span> <span class="nx">headers</span>
+    <span class="nx">res</span><span class="p">.</span><span class="nx">write</span><span class="p">(</span><span class="nx">body</span><span class="p">)</span> <span class="k">if</span> <span class="nx">body</span>
+    <span class="nx">res</span><span class="p">.</span><span class="nx">end</span><span class="p">()</span>
+
+  <span class="nv">_playbackResponseFromFile: </span><span class="nf">(req, res, filename) -&gt;</span>
+    <span class="nv">filepath = </span><span class="s">&quot;</span><span class="si">#{</span><span class="nx">@fixturePath</span><span class="si">}</span><span class="s">/</span><span class="si">#{</span><span class="nx">filename</span><span class="si">}</span><span class="s">&quot;</span>
+    <span class="nx">path</span><span class="p">.</span><span class="nx">exists</span> <span class="nx">filepath</span><span class="p">,</span> <span class="p">(</span><span class="nx">exists</span><span class="p">)</span> <span class="o">=&gt;</span>
+      <span class="k">if</span> <span class="nx">exists</span>
+        <span class="nx">fs</span><span class="p">.</span><span class="nx">readFile</span> <span class="nx">filepath</span><span class="p">,</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">data</span><span class="p">)</span> <span class="o">=&gt;</span>
+          <span class="k">try</span>
+            <span class="k">throw</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+            <span class="nv">recordedResponse = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">data</span>
+            <span class="nx">@responses</span><span class="p">[</span><span class="nx">filename</span><span class="p">]</span> <span class="o">=</span> <span class="nx">recordedResponse</span>
+            <span class="nx">@_playbackRecordedResponse</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="nx">recordedResponse</span>
+          <span class="k">catch</span> <span class="nx">e</span>
+            <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&quot;Error loading </span><span class="si">#{</span><span class="nx">filename</span><span class="si">}</span><span class="s">: </span><span class="si">#{</span><span class="nx">e</span><span class="si">}</span><span class="s">&quot;</span>
+            <span class="nx">res</span><span class="p">.</span><span class="nx">writeHead</span> <span class="mi">500</span>
+            <span class="nx">res</span><span class="p">.</span><span class="nx">end</span><span class="p">()</span>
+      <span class="k">else</span>
+        <span class="nx">@_respondWithNotFound</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="nx">filename</span>
+
+  <span class="nv">_playbackResponseFromFilename: </span><span class="nf">(req, res, filename) -&gt;</span>
+    <span class="k">if</span> <span class="nx">@notfound</span><span class="p">[</span><span class="nx">filename</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-3">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-3">&#182;</a>               </div>               <p>We've already had this request but do not have a recorded response</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nx">@_respondWithNotFound</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="nx">filename</span>
+    <span class="k">else</span></pre></div>             </td>           </tr>                               <tr id="section-4">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-4">&#182;</a>               </div>               <p>Get file contents out of cache unless options have it turned off</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nv">recordedResponse = </span><span class="nx">@responses</span><span class="p">[</span><span class="nx">filename</span><span class="p">]</span> <span class="nx">unless</span> <span class="nx">@options</span><span class="p">.</span><span class="nx">alwaysLoadFixtures</span>
+      <span class="k">if</span> <span class="nx">recordedResponse</span>
+        <span class="nx">@_playbackRecordedResponse</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="nx">recordedResponse</span>
+      <span class="k">else</span>
+        <span class="nx">@_playbackResponseFromFile</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="nx">filename</span>
+
+</pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 

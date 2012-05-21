@@ -6,6 +6,7 @@ SRC_DIR=src
 BIN_DIR=bin
 LIB_DIR=lib
 TEST_DIR=test
+DOCS_DIR=docs
 
 CLIENT_SOURCES:=$(wildcard $(SRC_DIR)/*.coffee)
 TEST_SOURCES:=$(wildcard $(TEST_DIR)/*.coffee)
@@ -34,7 +35,6 @@ all: build
 .PHONY: build
 build: modules $(CLIENT_OBJECTS) $(BIN_OBJECTS)
 
-
 .PHONY: build_test
 build_test: build $(TEST_OBJECTS)
 
@@ -61,10 +61,12 @@ modules: node_modules
 node_modules:
 	npm install -d
 
-.PHONY: debug
-debug: build
-	echo 'Make sure to start node-inspector!'
-	nodemon --debug-brk server.js
+.PHONY: docs
+docs: build
+	# 'Make sure you have docco and pygments installed'
+	# '>> easy_install Pygments'
+	# '>> npm install -g docco'
+	docco $(CLIENT_SOURCES)
 
 .PHONY: watch
 watch:
@@ -80,3 +82,4 @@ $(LIB_DIR)/%.js: $(SRC_DIR)/%.coffee
 
 $(LIB_DIR)/%.js: $(TEST_DIR)/%.coffee
 	coffee -o $(LIB_DIR) -c $<
+
