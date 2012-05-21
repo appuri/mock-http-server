@@ -21,7 +21,12 @@ been recorded or will return a 404 and display the verb and path on the console 
 Requirements
 ============
 
-`mock-http-server` requires Node 0.6.0+.  It has been tested on 0.6.15.
+`mock-http-server` requires Node 0.6.0+ and NPM.  It has been tested on 0.6.15.
+
+Once Node is installed, install global NPM modules:
+
+    npm install -g coffee-script vows
+
 
 Setup
 =====
@@ -37,7 +42,7 @@ To build and install a clean version:
 
     git clone <your repo>/mock-http-server.git
     cd mock-http-server
-    make pristine
+    make pristine && make
 
 This will install necessary NPM modules and rebuild the CoffeeScript sources.
 
