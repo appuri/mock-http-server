@@ -89,6 +89,7 @@ http.createServer((req, res) ->
 
 recordingProxyOptions =
   port: PROXYPORT
+  fixtures: 'test/fixtures'
   target: 
     host: HOSTNAME
     port: HTTPPORT

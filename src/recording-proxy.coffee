@@ -1,13 +1,17 @@
 events      = require 'events'
 http        = require 'http'
+fs          = require 'fs'
+path        = require 'path'
 crypto      = require 'crypto'
 querystring = require 'querystring'
 mock        = require '../lib/mock-http-server'
 
 exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
   constructor: (options = {}) ->
-    # Set up events
-    events.EventEmitter.call(@)
+    # Set up directory
+    fixtureDir = options.fixtures || 'fixtures'
+    @fixturePath = "#{__dirname}/../#{fixtureDir}"
+    fs.mkdirSync @fixturePath unless path.existsSync @fixturePath
 
     # Set up target information
     @target = options.target
@@ -22,7 +26,29 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
     outgoing  = new(@target.base)
     errState  = false
 
-    @emit 'start', req, res
+    #
+    # Capture data written to res
+    #
+    res.recording =
+      method: req.method
+      url: req.url
+      data: []
+    _writeHead = res.writeHead
+    res.writeHead = (statusCode, headers) ->
+      res.recording.statusCode = statusCode
+      res.recording.headers = headers
+      _writeHead.apply res, arguments
+
+    _write = res.write
+    res.write = (chunk) ->
+      res.recording.data.push chunk.toString('base64')
+      _write.apply res, arguments
+
+    writeRecordingToFile = ->
+      throw new Error("recording does not have a filename") unless res.recording.filename
+      filepath = "#{self.fixturePath}/#{res.recording.filename}"
+      recordingJSON = JSON.stringify(res.recording, true, 2)
+      fs.writeFileSync(filepath, recordingJSON)
 
     #
     # Outgoing request to target
@@ -81,7 +107,7 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
           reverseProxy.removeListener "error", proxyError
           try
             res.end()
-            console.log ">>> recording-proxy.coffee:84 ENDED", req.filename
+            writeRecordingToFile()
           catch ex
             console.error "res.end error: %s", ex.message
           self.emit "end", req, res
@@ -124,10 +150,15 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
           setTimeout (-> reverseProxy.emit "drain"), 100
 
     req.on "end", ->
-      req.filename = mock._generateFilename(req.method, req.url, req.bodyHash?.digest('hex'))
+      res.recording.filename = mock._generateResponseFilename(req.method, req.url, req.bodyHash?.digest('hex'))
       reverseProxy.end() unless errState
 
     req.on "close", ->
       reverseProxy.abort() unless errState
 
-  close: -> @emit 'end'
+  close: ->
+    proxy = @target
+    if proxy and proxy.agent
+      for host of proxy.agent.sockets
+        for socket in proxy.agent.sockets[host]
+          socket.end()
