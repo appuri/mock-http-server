@@ -43,6 +43,7 @@ build_test_runners: build_test $(TEST_RUNNERS)
 
 .PHONY: test
 test: build_test_runners
+	rm test/fixtures/*.response
 	vows --spec $(TEST_RUNNERS)
 
 .PHONY: clean
