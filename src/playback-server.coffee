@@ -27,7 +27,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
 
   _respondWithNotFound: (req, res, filename) ->
-    if @options.logUnknownRequests
+    unless @options.hideUnknownRequests
       unless @notfound[filename]
         if _.isEmpty(@notfound)
           console.log "Unrecorded requests:"

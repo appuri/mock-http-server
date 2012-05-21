@@ -16,6 +16,8 @@ TEST_OBJECTS:=$(patsubst $(TEST_DIR)/%.coffee,$(LIB_DIR)/%.js,$(TEST_SOURCES))
 TEST_RUNNERS_SOURCES:=$(wildcard $(TEST_DIR)/*-test.coffee)
 TEST_RUNNERS:=$(patsubst $(TEST_DIR)/%-test.coffee,$(LIB_DIR)/%-test.js,$(TEST_RUNNERS_SOURCES))
 
+BIN_OBJECTS=$(BIN_DIR)/mock-http-proxy
+
 # Detect if we're running Windows
 ifdef SystemRoot
 # If so, set the file & folder deletion commands:
@@ -30,7 +32,7 @@ endif
 all: build
 
 .PHONY: build
-build: modules $(CLIENT_OBJECTS)
+build: modules $(CLIENT_OBJECTS) $(BIN_OBJECTS)
 
 
 .PHONY: build_test
@@ -66,6 +68,11 @@ debug: build
 .PHONY: watch
 watch:
 	coffee --watch -o $(LIB_DIR) -c $(SRC_DIR) $(TEST_DIR)
+
+$(BIN_DIR)/mock-http-proxy: $(CLIENT_OBJECTS)
+	echo "#!/usr/bin/env node" > $(BIN_DIR)/mock-http-proxy
+	cat $(LIB_DIR)/app.js >> $(BIN_DIR)/mock-http-proxy
+	chmod ug+x $(BIN_DIR)/mock-http-proxy
 
 $(LIB_DIR)/%.js: $(SRC_DIR)/%.coffee
 	coffee -o $(LIB_DIR) -c $<

@@ -103,7 +103,7 @@ createRecordingProxyServer recordingProxyOptions
 playbackServerOptions =
   port: PLAYBACKPORT          # port to listen on
   fixtures: 'test/fixtures'   # directory where the fixture files are
-  logUnknownRequests: false   # do not show them on screen during testing
+  hideUnknownRequests: true   # do not show them on screen during testing
 createPlaybackServer playbackServerOptions
 
 #
