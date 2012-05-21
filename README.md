@@ -38,6 +38,7 @@ To build and install a clean version:
     git clone <your repo>/mock-http-server.git
     cd mock-http-server
     make pristine
+    make
 
 This will install necessary NPM modules and rebuild the CoffeeScript sources.
 
