@@ -21,12 +21,12 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
     req.on "end", =>
       filename = mock._generateResponseFilename(req.method, req.url, req.bodyHash?.digest('hex'))
-      @_playbackResponseFromFilename res, filename
+      @_playbackResponseFromFilename req, res, filename
 
   close: -> undefined
 
 
-  _respondWithNotFound: (res, filename) ->
+  _respondWithNotFound: (req, res, filename) ->
     if @options.logUnknownRequests
       unless @notfound[filename]
         if _.isEmpty(@notfound)
@@ -36,7 +36,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     res.writeHead 404
     res.end()
 
-  _playbackRecordedResponse: (res, recordedResponse) ->
+  _playbackRecordedResponse: (req, res, recordedResponse) ->
     { statusCode, headers, data, body } = recordedResponse
     if not body and data.length > 0 
       debugger;
@@ -60,7 +60,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     res.write(body) if body
     res.end()
 
-  _playbackResponseFromFile: (res, filename) ->
+  _playbackResponseFromFile: (req, res, filename) ->
     filepath = "#{@fixturePath}/#{filename}"
     path.exists filepath, (exists) =>
       if exists
@@ -69,23 +69,23 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
             throw err if err
             recordedResponse = JSON.parse data
             @responses[filename] = recordedResponse
-            @_playbackRecordedResponse res, recordedResponse
+            @_playbackRecordedResponse req, res, recordedResponse
           catch e
             console.log "Error loading #{filename}: #{e}"
             res.writeHead 500
             res.end()
       else
-        @_respondWithNotFound res, filename
+        @_respondWithNotFound req, res, filename
 
-  _playbackResponseFromFilename: (res, filename) ->
+  _playbackResponseFromFilename: (req, res, filename) ->
     if @notfound[filename]
       # We've already had this request but do not have a recorded response
-      @_respondWithNotFound res, filename
+      @_respondWithNotFound req, res, filename
     else
       # Get file contents out of cache unless options have it turned off
       recordedResponse = @responses[filename] unless @options.alwaysLoadFixtures
       if recordedResponse
-        @_playbackRecordedResponse res, recordedResponse
+        @_playbackRecordedResponse req, res, recordedResponse
       else
-        @_playbackResponseFromFile res, filename
+        @_playbackResponseFromFile req, res, filename
 
