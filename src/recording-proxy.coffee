@@ -73,6 +73,9 @@ exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
     outgoing.path = req.url
     outgoing.headers = req.headers
 
+    # Replace reverseProxyRequest's host to the target
+    outgoing.headers.host = "#{@target.host}:#{@target.port}"
+
     reverseProxy = @target.protocol.request outgoing, (response) ->
       # Match header connection between source and target responses
       if response.headers.connection

@@ -50,6 +50,14 @@ respondToGETRequest = (req, res) ->
     when '/imagetest'
       res.writeHead 200, "Content-Type": "image/png"
       res.write TEST_IMAGE_DATA
+    when '/checkhost'
+      expectedHost = "#{HOSTNAME}:#{HTTPPORT}"
+      if req.headers.host == expectedHost
+        res.writeHead 200, "Content-Type": "text/plain"
+      else
+        res.writeHead 500, "Content-Type": "text/plain"
+        res.write("host should be #{expectedHost}")
+      res.end('\n')
     else
       writeUnknownRequest res
   res.end()
@@ -175,6 +183,17 @@ testGETJSON = (port) ->
       assert.deepEqual JSON.parse(results.body), { jsontest: true }
   }
 
+testGETCheckHost = (port) ->
+  return {
+    topic: ->
+      getRequest port, '/checkhost', @callback
+    'should not have errors': (error, results) ->
+      assert.isNull error
+    'should respond with HTTP 200': (results) ->
+      assert.equal results.statusCode, 200
+      assert.equal results.body, '\n'
+  }
+
 testGETImage = (port) ->
   return {
     topic: ->
@@ -246,6 +265,7 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
     'Getting large binary data from the recording proxy': testGETImage PROXYPORT
     'Posting to an unknown page on the recording proxy': testPOSTUnknown PROXYPORT
     'Posting JSON to an API on the recording proxy': testPOSTJSON PROXYPORT
+    'Getting from the proxy should change host to target': testGETCheckHost PROXYPORT
 
   #
   # Verify that the Playback Server (running on PLAYBACKPORT) loads the recorded responses
