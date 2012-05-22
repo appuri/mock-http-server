@@ -11,6 +11,7 @@
     "vows": "= 0.6.2"
   },
   "scripts": {
-    "test": "vows --spec test/*-test.coffee"
+    "test": "vows --spec test/*-test.coffee",
+    "docs": "docco src/*.coffee"
   }
 }

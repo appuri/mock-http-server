@@ -6,7 +6,7 @@ specific to the request.</p>             </td>             <td class="code">    
 <span class="nv">path        = </span><span class="nx">require</span> <span class="s">&#39;path&#39;</span>
 <span class="nv">crypto      = </span><span class="nx">require</span> <span class="s">&#39;crypto&#39;</span>
 <span class="nv">querystring = </span><span class="nx">require</span> <span class="s">&#39;querystring&#39;</span>
-<span class="nv">mock        = </span><span class="nx">require</span> <span class="s">&#39;../lib/mock-http-server&#39;</span>
+<span class="nv">mock        = </span><span class="nx">require</span> <span class="s">&#39;../src/mock-http-server&#39;</span>
 
 <span class="nv">exports.RecordingProxy = </span><span class="k">class</span> <span class="nx">RecordingProxy</span> <span class="k">extends</span> <span class="nx">events</span><span class="p">.</span><span class="nx">EventEmitter</span>
   <span class="nv">constructor: </span><span class="nf">(@options = {}) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Set up directory</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">fixtureDir = </span><span class="nx">options</span><span class="p">.</span><span class="nx">fixtures</span> <span class="o">||</span> <span class="s">&#39;fixtures&#39;</span>
