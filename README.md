@@ -23,11 +23,6 @@ Requirements
 
 `mock-http-server` requires Node 0.6.0+ and NPM.  It has been tested on 0.6.15.
 
-Once Node is installed, install global NPM modules:
-
-    npm install -g coffee-script vows
-
-
 Setup
 =====
 
@@ -38,17 +33,17 @@ If you are stubbing out a service that is accessed by multiple client machines, 
 run `mock-http-server` on the same box as the server it is targeting and either move the 
 server to a new port or update clients to point to `mock-http-server`'s listening port.
 
-To build and install a clean version:
+To install a clean version:
 
     git clone <your repo>/mock-http-server.git
     cd mock-http-server
-    make pristine && make
+    npm install -d
 
-This will install necessary NPM modules and rebuild the CoffeeScript sources.
+This will install necessary NPM modules.
 
 Verify installation by running:
 
-    make test
+    npm test
 
 For more information on options:
 

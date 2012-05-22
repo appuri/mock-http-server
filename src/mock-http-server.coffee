@@ -1,8 +1,8 @@
 http          = require 'http'
 https         = require 'https'
 querystring   = require 'querystring'
-recording     = require '../lib/recording-proxy'
-playback      = require '../lib/playback-server'
+recording     = require '../src/recording-proxy'
+playback      = require '../src/playback-server'
 
 maxSockets = 100
 

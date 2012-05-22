@@ -8,7 +8,7 @@ fs          = require 'fs'
 path        = require 'path'
 crypto      = require 'crypto'
 {_}         = require 'underscore'
-mock        = require '../lib/mock-http-server'
+mock        = require '../src/mock-http-server'
 
 exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 

@@ -9,7 +9,7 @@ fs          = require 'fs'
 path        = require 'path'
 crypto      = require 'crypto'
 querystring = require 'querystring'
-mock        = require '../lib/mock-http-server'
+mock        = require '../src/mock-http-server'
 
 exports.RecordingProxy = class RecordingProxy extends events.EventEmitter
   constructor: (@options = {}) ->

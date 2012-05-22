@@ -2,8 +2,8 @@ vows      = require 'vows'
 assert    = require 'assert'
 http      = require 'http'
 {_}       = require 'underscore'
-helpers   = require '../lib/helpers'
-mock      = require '../lib/mock-http-server'
+helpers   = require '../test/helpers'
+mock      = require '../src/mock-http-server'
 
 {responseWrapper, testHTTPRunning, requestOptions, postJSONOptions} = helpers
 {createRecordingProxyServer, createPlaybackServer} = mock

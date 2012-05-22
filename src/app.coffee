@@ -6,7 +6,7 @@ http    = require 'http'
 url     = require 'url'
 {argv}  = require 'optimist'
 {_}     = require 'underscore'
-mock    = require '../lib/mock-http-server'
+mock    = require '../src/mock-http-server'
 
 {createRecordingProxyServer, createPlaybackServer} = mock
 
