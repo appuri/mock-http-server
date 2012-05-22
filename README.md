@@ -52,6 +52,7 @@ For more information on options:
 Example:
 
     [Start the Recording Proxy]
+
     ./bin/mock-http-proxy 9000 --record=www.google.com
     Running in recording mode
       Recording calls to www.google.com
@@ -59,43 +60,30 @@ Example:
       Listening at http://localhost:9000/
     
     curl http://localhost:9000
-    <HTML><HEAD><meta http-equiv="content-type" content="text/html;charset=utf-8">
-    <TITLE>302 Moved</TITLE></HEAD><BODY>
-    <H1>302 Moved</H1>
-    The document has moved
-    <A HREF="http://www.google.com/">here</A>.
-    </BODY></HTML>
+    (HTTP response)
+    
     [Stop the Recording Proxy with Ctrl+C]
     
     [See the fixture data]
+
     ls -al fixtures/
     cat fixtures/GET-.response
     {
       "method": "GET",
       "url": "/",
-      "data": ["PEhUTUw+PEhFQUQ+..."],
       "filename": "GET-.response",
-      "statusCode": 302,
+      "statusCode": 200,
       "headers": {
-        "location": "http://www.google.com/",
-        "cache-control": "private",
-        "content-type": "text/html; charset=UTF-8",
-        "x-content-type-options": "nosniff",
-        "date": "Mon, 21 May 2012 21:36:01 GMT",
-        "server": "sffe",
-        "content-length": "219",
-        "x-xss-protection": "1; mode=block"
+        ...
       }
+      "data": []
     }
 
     [Start the Playback Server]
+
     ./bin/mock-http-proxy 9000
     curl http://localhost:9000
-    <HTML><HEAD><meta http-equiv="content-type" content="text/html;charset=utf-8">
-    <TITLE>302 Moved</TITLE></HEAD><BODY>
-    <H1>302 Moved</H1>
-    The document has moved
-    <A HREF="http://www.google.com/">here</A>.
-    </BODY></HTML>
+    (HTTP response)
+
     [Stop the Playback Server with Ctrl+C]
 
