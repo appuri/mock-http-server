@@ -1,3 +1,11 @@
+#
+# This test suite starts HTTP and HTTPS servers, a recording proxy
+# and a playback server.
+# 
+# The test batches mostly test that the same requests return from
+# each server.  Therefore you
+# The fixture data is stored in ./test/fixtures
+#
 vows      = require 'vows'
 assert    = require 'assert'
 http      = require 'http'
@@ -125,7 +133,6 @@ getRawRequest = (port, path, callback, encoding) ->
 
 getRequest = (port, path, callback) -> getRawRequest(port, path, callback, 'utf8')
 getImageRequest = (port, path, callback) -> getRawRequest(port, path, callback)
-
 postRequest = (port, path, params, callback) ->
   {options, body} = postJSONOptions HOSTNAME, port, path, params
   req = http.request options, responseWrapper(callback, 'utf8')
@@ -133,103 +140,76 @@ postRequest = (port, path, params, callback) ->
   req.end()
   return
 
+
+testRequest = (topic, statusCode = 200, vows = {}) ->
+  test = { topic }
+  test["should respond with HTTP #{statusCode}"] = (results) -> 
+    assert.equal results.statusCode, statusCode
+  test['should not have errors'] = (error, results) ->
+    assert.isNull error
+  _(test).extend vows
+
+testGET = (port, path, statusCode, vows) ->
+  topic = -> getRequest port, path, @callback
+  testRequest topic, statusCode, vows
+testImage = (port, path, statusCode, vows) ->
+  topic = -> getImageRequest port, path, @callback
+  testRequest topic, statusCode, vows
+testPOST = (port, path, params, statusCode, vows = {}) ->
+  topic = -> postRequest port, path, params, @callback
+  testRequest topic, statusCode, vows
+
+
 #
 # Parameterized tests
 # We run the same tests on different ports to make sure that the proxy
 # and playback return the original results from the target server
 #
 
-testGETUnknown = (port) ->
-  return {
-    topic: ->
-      getRequest port, '/does-not-exist', @callback
-    'should not have errors': (error, results) ->
-      assert.isNull error
-    'should respond with HTTP 404': (results) ->
-      assert.equal results.statusCode, 404    
-  }
-
-testGETUnrecorded = (port) ->
-  return {
-    topic: ->
-      getRequest port, '/was-not-recorded', @callback
-    'should not have errors': (error, results) ->
-      assert.isNull error
-    'should respond with HTTP 404': (results) ->
-      assert.equal results.statusCode, 404    
-  }
-
-testGETText = (port) ->
-  return {
-    topic: ->
-      getRequest port, '/texttest', @callback
-    'should not have errors': (error, results) ->
-      assert.isNull error
-    'should respond with HTTP 200 and have text data': (results) ->
-      assert.equal results.statusCode, 200
+testGETUnknown = (port) -> testGET port, '/does-not-exist', 404
+testGETUnrecorded = (port) -> testGET port, '/was-not-recorded', 404
+testGETCheckHost = (port) -> testGET port, '/checkhost'
+testGETText = (port) -> 
+  testGET port, '/texttest', 200,
+    'should have text data': (results) ->
       assert.equal results.headers['content-type'], "text/plain"
       assert.equal results.body, 'texttest'    
-  }
-
-testGETJSON = (port) ->
-  return {
-    topic: ->
-      getRequest port, '/jsontest', @callback
-    'should not have errors': (error, results) ->
-      assert.isNull error
-    'should respond with HTTP 200 and have JSON data': (results) ->
-      assert.equal results.statusCode, 200
+testGETJSON = (port) -> 
+  testGET port, '/jsontest', 200,
+    'should respond with JSON data': (results) ->
       assert.equal results.headers['content-type'], "application/json"
       assert.deepEqual JSON.parse(results.body), { jsontest: true }
-  }
-
-testGETCheckHost = (port) ->
-  return {
-    topic: ->
-      getRequest port, '/checkhost', @callback
-    'should not have errors': (error, results) ->
-      assert.isNull error
-    'should respond with HTTP 200': (results) ->
-      assert.equal results.statusCode, 200
-      assert.equal results.body, '\n'
-  }
-
 testGETImage = (port) ->
-  return {
-    topic: ->
-      getImageRequest port, '/imagetest', @callback
-    'should not have errors': (error, results) ->
-      assert.isNull error
-    'should respond with HTTP 200 and have image data': (results) ->
-      assert.equal results.statusCode, 200
+  testImage port, '/imagetest', 200,
+    'should respond with image data': (results) ->
       assert.equal results.headers['content-type'], "image/png"
     'should have the same binary image sent by the server': (results) ->
       if results.body.toString('base64') != TEST_IMAGE_DATA.toString('base64')
         assert.isTrue false, "Image received (#{results.body.length} bytes) is not the same as file (#{TEST_IMAGE_DATA.length} bytes)"
-  }
-
-testPOSTUnknown = (port) ->
-  return {
-    topic: ->
-      postRequest port, '/does-not-exist', {}, @callback
-    'should not have errors': (error, results) ->
-      assert.isNull error
-    'should respond with HTTP 404': (results) ->
-      assert.equal results.statusCode, 404   
-  }
-
-testPOSTJSON = (port) ->
-  return {
-    topic: ->
-      postRequest port, '/posttest', { test: 'posttest' }, @callback
-    'should not have errors': (error, results) ->
-      assert.isNull error
-    'should respond with HTTP 200': (results) ->
-      assert.equal results.statusCode, 200
+testPOSTUnknown = (port) -> testPOST port, '/does-not-exist', {}, 404
+testPOSTJSON = (port) -> 
+  testPOST port, '/posttest', { test: 'posttest' }, 200,
     'should respond with JSON': (results) ->
       assert.equal results.headers['content-type'], "application/json"
-      assert.deepEqual JSON.parse(results.body), { posttest: true }    
-  }
+      assert.deepEqual JSON.parse(results.body), { posttest: true }
+
+
+#
+# Parameterized Batch
+#
+# A suite of the same tests are run against all servers to make sure
+# the same resutls are returned
+#
+
+createTestBatch = (name, port) ->
+  test = {}
+  test["Getting an unknown page from the #{name} server"] = testGETUnknown port
+  test["Getting text the #{name} server"] = testGETText port
+  test["Getting JSON from the #{name} server"] = testGETJSON port
+  test["Getting an image from the #{name} server"] = testGETImage port
+  test["Posting to an unknown page on the #{name} server"] = testPOSTUnknown port
+  test["Posting JSON to the #{name} server"] = testPOSTJSON port
+  test
 
 #
 # Test Suite
@@ -247,36 +227,24 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
   #
   # Verify that the Target HTTP Server (running on HTTPPORT) returns known data
   #
-  .addBatch
-    'Getting an unknown page from the target server': testGETUnknown HTTPPORT
-    'Getting text from an API from the target server': testGETText HTTPPORT
-    'Getting JSON from an API from the target server': testGETJSON HTTPPORT
-    'Getting large binary data from the target server': testGETImage HTTPPORT
-    'Posting to an unknown page on the target server': testPOSTUnknown HTTPPORT
-    'Posting JSON to an API on the target server': testPOSTJSON HTTPPORT
+  .addBatch(createTestBatch('target', HTTPPORT))
 
   #
   # Verify that the Recording Proxy (running PROXYPORT) passes through the requests to the Target HTTP Server
   #
+  .addBatch(createTestBatch('recording', PROXYPORT))
+
+  # Tests specific to the recording proxy
   .addBatch
-    'Getting an unknown page from the recording proxy': testGETUnknown PROXYPORT
-    'Getting text from an API from the recording proxy': testGETText PROXYPORT
-    'Getting JSON from an API from the recording proxy': testGETJSON PROXYPORT
-    'Getting large binary data from the recording proxy': testGETImage PROXYPORT
-    'Posting to an unknown page on the recording proxy': testPOSTUnknown PROXYPORT
-    'Posting JSON to an API on the recording proxy': testPOSTJSON PROXYPORT
     'Getting from the proxy should change host to target': testGETCheckHost PROXYPORT
 
   #
   # Verify that the Playback Server (running on PLAYBACKPORT) loads the recorded responses
   #
+  .addBatch(createTestBatch('playback', PLAYBACKPORT))
+
+  # Tests specific to the playback server
   .addBatch
-    'Getting an unknown page from the playback server': testGETUnknown PLAYBACKPORT
-    'Getting text from an API from the playback server': testGETText PLAYBACKPORT
-    'Getting JSON from an API from the playback server': testGETJSON PLAYBACKPORT
-    'Getting large binary data from the playback server': testGETImage PLAYBACKPORT
-    'Posting to an unknown page on the playback server': testPOSTUnknown PLAYBACKPORT
-    'Posting JSON to an API on the playback server': testPOSTJSON PLAYBACKPORT
     'Getting an unrecorded page from the playback server': testGETUnrecorded PLAYBACKPORT
 
   .export(module)
