@@ -36,11 +36,9 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     # Calculate a unique filename for this request and
     # send the response from the file
     req.on "end", =>
-      filename = mock._generateResponseFilename(req.method, req.url, req.bodyHash?.digest('hex'))
+      bodyHash = req.bodyHash?.digest('hex')
+      filename = mock._generateResponseFilename(req.method, req.url, bodyHash)
       @_playbackResponseFromFilename req, res, filename
-
-  close: -> undefined
-
 
   # When a response has not been recorded, this
   # method will log that to the console and
@@ -60,24 +58,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
   # in the original chunks sent from the client
   # encoded into base64 for serialization
   _playbackRecordedResponse: (req, res, recordedResponse) ->
-    { statusCode, headers, data, body } = recordedResponse
-    if not body and data.length > 0 
-      # Create body from base64 encoded data chunks
-      chunks = []
-      while not _.isEmpty(data)
-        base64chunk = data.shift()
-        chunks.push(new Buffer(base64chunk, 'base64'))
-
-      totalLength = 0
-      for chunk in chunks
-        totalLength += chunk.length
-      body = new Buffer(totalLength)
-      offset = 0
-      for chunk in chunks
-        chunk.copy(body, offset)
-        offset += chunk.length
-      recordedResponse.body = body
-
+    { statusCode, headers, body } = recordedResponse
     res.writeHead statusCode, headers
     res.write(body) if body
     res.end()
@@ -91,6 +72,9 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
           try
             throw err if err
             recordedResponse = JSON.parse data
+            if recordedResponse.body64
+              recordedResponse.body = new Buffer(recordedResponse.body64, 'base64')
+              delete recordedResponse.body64
             @responses[filename] = recordedResponse unless @options.alwaysLoadFixtures
             @_playbackRecordedResponse req, res, recordedResponse
           catch e

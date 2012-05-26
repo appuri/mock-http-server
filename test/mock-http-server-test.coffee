@@ -100,7 +100,14 @@ respond = (req, res) ->
       writeUnknownRequest res
       res.end()
 
-http.createServer(respond).listen HTTPPORT, HOSTNAME
+http.createServer((req, res) ->
+  if req.method == 'GET' and req.url == '/secure'
+    # Redirect to HTTPS if HTTP request to a secure URL
+    res.writeHead 302, "Location": "https://#{HOSTNAME}:#{HTTPSPORT}#{req.url}"
+    res.end()
+  else
+    respond req, res
+).listen HTTPPORT, HOSTNAME
 
 #
 # Create an HTTPS server to test redirects
@@ -109,7 +116,15 @@ http.createServer(respond).listen HTTPPORT, HOSTNAME
 sslOptions =
   'key': fs.readFileSync(__dirname + '/SSL/privatekey.pem')
   'cert': fs.readFileSync(__dirname + '/SSL/certificate.pem')
-https.createServer(sslOptions, respond).listen HTTPSPORT, HOSTNAME
+https.createServer(sslOptions, (req, res) ->
+  if req.method == 'GET' and req.url == '/secure'
+    # Return 'secure' data if requested over HTTPS
+    res.writeHead 200, "Content-Type": "application/json"
+    res.write JSON.stringify({ secure: true })
+    res.end()
+  else
+    respond req, res
+).listen HTTPSPORT, HOSTNAME
 
 #
 # Recording Proxy Server
@@ -117,11 +132,9 @@ https.createServer(sslOptions, respond).listen HTTPSPORT, HOSTNAME
 #
 
 recordingProxyOptions =
-  port: PROXYPORT             # port to listen on
-  fixtures: 'test/fixtures'   # directory where the fixture files are
-  target:                     # target server to proxy
-    host: HOSTNAME
-    port: HTTPPORT
+  port: PROXYPORT                     # port to listen on
+  fixtures: 'test/fixtures'           # directory where the fixture files are
+  target: "#{HOSTNAME}:#{HTTPPORT}"   # target server to proxy
 createRecordingProxyServer recordingProxyOptions
 
 #
@@ -156,11 +169,10 @@ postRequest = (port, path, params, callback) ->
 
 testRequest = (topic, statusCode = 200, vows = {}) ->
   test = { topic }
-  test["should respond with HTTP #{statusCode}"] = (results) -> 
+  test["should respond with HTTP #{statusCode}"] = (error, results) -> 
+    assert.isNull error, "Request had an error #{error}"
     if results.statusCode != statusCode
       assert.isTrue false, "Received statusCode (#{results.statusCode}) expected (#{statusCode})\n#{results.body}"
-  test['should not have errors'] = (error, results) ->
-    assert.isNull error
   _(test).extend vows
 
 testGET = (port, path, statusCode, vows) ->
@@ -181,8 +193,6 @@ testPOST = (port, path, params, statusCode, vows = {}) ->
 #
 
 testGETUnknown = (port) -> testGET port, '/does-not-exist', 404
-testGETUnrecorded = (port) -> testGET port, '/was-not-recorded', 404
-testGETCheckHost = (port) -> testGET port, '/checkhost'
 testGETText = (port) -> 
   testGET port, '/texttest', 200,
     'should have text data': (results) ->
@@ -237,29 +247,46 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
     'The Target HTTP Server': testHTTPRunning "ERROR: could not connect to Target HTTP Server", HTTPPORT
   .addBatch
     'The Recording Proxy Server': testHTTPRunning "ERROR: could not connect to Recording Proxy Server", PROXYPORT
-
-  #
-  # Verify that the Target HTTP Server (running on HTTPPORT) returns known data
-  #
-  .addBatch(createTestBatch('target', HTTPPORT))
-
-  #
-  # Verify that the Recording Proxy (running PROXYPORT) passes through the requests to the Target HTTP Server
-  #
-  .addBatch(createTestBatch('recording', PROXYPORT))
-
-  # Tests specific to the recording proxy
   .addBatch
-    'Getting from the proxy should change host to target': testGETCheckHost PROXYPORT
+    'The playback Server': testHTTPRunning "ERROR: could not connect to the Playback Server", PLAYBACKPORT
 
   #
-  # Verify that the Playback Server (running on PLAYBACKPORT) loads the recorded responses
+  # Verify that the HTTP request suite works
   #
+
+  # [FIRST] Directly on the target
+  .addBatch(createTestBatch('target', HTTPPORT))
+  # [SECOND] Through the proxy forwarding to the target
+  .addBatch(createTestBatch('recording', PROXYPORT))
+  # [THIRD] From the playback server
   .addBatch(createTestBatch('playback', PLAYBACKPORT))
 
-  # Tests specific to the playback server
+  #
+  # Additional server-specific tests for edge cases
+  #
+
   .addBatch
-    'Getting an unrecorded page from the playback server': testGETUnrecorded PLAYBACKPORT
+    'Getting secure data from the HTTP server': testGET(HTTPPORT, '/secure', 302,
+      'should contain a location header': (results) ->
+        assert.equal results.headers.location, "https://#{HOSTNAME}:#{HTTPSPORT}/secure"
+    )
+
+  .addBatch
+    'Verifying the host in the HTTP headers from the proxy': testGET(PROXYPORT, '/checkhost')
+    'Getting secure data from the HTTPS server via the proxy': testGET(PROXYPORT, '/secure', 200,
+      'should respond with JSON data': (results) ->
+        assert.equal results.headers['content-type'], "application/json"
+        assert.deepEqual JSON.parse(results.body), { secure: true }
+    )
+
+  .addBatch
+    'Getting an unrecorded page from the playback server': testGET PLAYBACKPORT, '/was-not-recorded', 404
+    'Getting secure data from the playback server': testGET(PLAYBACKPORT, '/secure', 200,
+      'should respond with JSON data': (results) ->
+        assert.equal results.headers['content-type'], "application/json"
+        assert.deepEqual JSON.parse(results.body), { secure: true }
+    )
+
 
   .export(module)
 
