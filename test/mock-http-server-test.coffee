@@ -8,7 +8,9 @@
 #
 vows      = require 'vows'
 assert    = require 'assert'
+fs        = require 'fs'
 http      = require 'http'
+https     = require 'https'
 {_}       = require 'underscore'
 helpers   = require '../test/helpers'
 mock      = require '../src/mock-http-server'
@@ -20,6 +22,7 @@ HOSTNAME      = '127.0.0.1'
 HTTPPORT      = 7771  # Target HTTP server
 PROXYPORT     = 7772  # Recording Proxy Server
 PLAYBACKPORT  = 7773  # Playback HTTP server
+HTTPSPORT     = 7774  # Target HTTPS server
 
 #
 # Binary data used for testing large HTTP response bodies
@@ -83,7 +86,7 @@ respondToPOSTRequest = (req, res) ->
       writeUnknownRequest res
   res.end()
 
-http.createServer((req, res) ->
+respond = (req, res) ->
   switch req.method
     when 'GET'
       # Respond immediately
@@ -96,7 +99,17 @@ http.createServer((req, res) ->
     else
       writeUnknownRequest res
       res.end()
-).listen HTTPPORT, HOSTNAME
+
+http.createServer(respond).listen HTTPPORT, HOSTNAME
+
+#
+# Create an HTTPS server to test redirects
+#
+
+sslOptions =
+  'key': fs.readFileSync(__dirname + '/SSL/privatekey.pem')
+  'cert': fs.readFileSync(__dirname + '/SSL/certificate.pem')
+https.createServer(sslOptions, respond).listen HTTPSPORT, HOSTNAME
 
 #
 # Recording Proxy Server
@@ -144,7 +157,8 @@ postRequest = (port, path, params, callback) ->
 testRequest = (topic, statusCode = 200, vows = {}) ->
   test = { topic }
   test["should respond with HTTP #{statusCode}"] = (results) -> 
-    assert.equal results.statusCode, statusCode
+    if results.statusCode != statusCode
+      assert.isTrue false, "Received statusCode (#{results.statusCode}) expected (#{statusCode})\n#{results.body}"
   test['should not have errors'] = (error, results) ->
     assert.isNull error
   _(test).extend vows
