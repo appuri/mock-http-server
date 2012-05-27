@@ -38,14 +38,18 @@ exports.RecordingProxy = class RecordingProxy
 
       # Request will replace the host with the target
       delete outgoing.headers.host
+      filepath = "#{self.fixturePath}/#{req.filename}"
+
+      logErrorToConsole = (error) ->
+        console.log "Error writing request #{req.method} #{req.url} to #{filepath}"
+        console.log error
 
       # Issue request to target
       request outgoing, (error, response, body) ->
         if error
-          console.log error
+          logErrorToConsole error
           res.writeHead 500, "Content-Type": "text/plain"
-          res.write(error)
-          res.write("\n\n")
+          res.write(error.toString())
           res.end()
           return
 
@@ -53,7 +57,6 @@ exports.RecordingProxy = class RecordingProxy
         delete response.headers["transfer-encoding"] if req.httpVersion == "1.0"
 
         # Save recorded data to file
-        filepath = "#{self.fixturePath}/#{req.filename}"
         recordingData =
           filepath: req.filename
           method: req.method
@@ -66,9 +69,7 @@ exports.RecordingProxy = class RecordingProxy
         recordingJSON = JSON.stringify(recordingData, true, 2)
         fs.writeFile filepath, recordingJSON, (err) ->
           # Respond after file is written
-          if err
-            console.log "Error writing request #{req.method} #{req.url} to #{filepath}"
-            console.log err
+          logErrorToConsole(err) if err
           res.writeHead response.statusCode, response.headers
           res.write body if body
           res.end()

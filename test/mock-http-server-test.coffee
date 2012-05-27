@@ -3,7 +3,8 @@
 # and a playback server.
 # 
 # The test batches mostly test that the same requests return from
-# each server.  Therefore you
+# each server.
+#
 # The fixture data is stored in ./test/fixtures
 #
 vows      = require 'vows'
@@ -55,12 +56,19 @@ respondToGETRequest = (req, res) ->
     when '/texttest'
       res.writeHead 200, "Content-Type": "text/plain"
       res.write "texttest"
-    when '/jsontest'
+    when '/jsontest/?param=test'
       res.writeHead 200, "Content-Type": "application/json"
       res.write JSON.stringify({ jsontest: true })
     when '/imagetest'
       res.writeHead 200, "Content-Type": "image/png"
       res.write TEST_IMAGE_DATA
+    when '/not-modified'
+      res.writeHead 304
+    when '/infiniteloop'
+      res.writeHead 302, "Location": "http://#{req.headers.host}#{req.url}"
+    when '/server-error'
+      res.writeHead 500, "Content-Type": "text/plain"
+      res.write "Server Error Test"
     when '/checkhost'
       expectedHost = "#{HOSTNAME}:#{HTTPPORT}"
       if req.headers.host == expectedHost
@@ -68,7 +76,6 @@ respondToGETRequest = (req, res) ->
       else
         res.writeHead 500, "Content-Type": "text/plain"
         res.write("host should be #{expectedHost}")
-      res.end('\n')
     else
       writeUnknownRequest res
   res.end()
@@ -166,7 +173,6 @@ postRequest = (port, path, params, callback) ->
   req.end()
   return
 
-
 testRequest = (topic, statusCode = 200, vows = {}) ->
   test = { topic }
   test["should respond with HTTP #{statusCode}"] = (error, results) -> 
@@ -197,9 +203,9 @@ testGETText = (port) ->
   testGET port, '/texttest', 200,
     'should have text data': (results) ->
       assert.equal results.headers['content-type'], "text/plain"
-      assert.equal results.body, 'texttest'    
+      assert.equal results.body, 'texttest'
 testGETJSON = (port) -> 
-  testGET port, '/jsontest', 200,
+  testGET port, '/jsontest/?param=test', 200,
     'should respond with JSON data': (results) ->
       assert.equal results.headers['content-type'], "application/json"
       assert.deepEqual JSON.parse(results.body), { jsontest: true }
@@ -210,6 +216,8 @@ testGETImage = (port) ->
     'should have the same binary image sent by the server': (results) ->
       if results.body.toString('base64') != TEST_IMAGE_DATA.toString('base64')
         assert.isTrue false, "Image received (#{results.body.length} bytes) is not the same as file (#{TEST_IMAGE_DATA.length} bytes)"
+testGETNotModified = (port) -> testGET port, '/not-modified', 304
+testGETServerError = (port) -> testGET port, '/server-error', 500
 testPOSTUnknown = (port) -> testPOST port, '/does-not-exist', {}, 404
 testPOSTJSON = (port) -> 
   testPOST port, '/posttest', { test: 'posttest' }, 200,
@@ -231,6 +239,8 @@ createTestBatch = (name, port) ->
   test["Getting text the #{name} server"] = testGETText port
   test["Getting JSON from the #{name} server"] = testGETJSON port
   test["Getting an image from the #{name} server"] = testGETImage port
+  test["Getting a URL that is not modified from the #{name} server"] = testGETNotModified port
+  test["Getting a URL that results in a error from the #{name} server"] = testGETServerError port
   test["Posting to an unknown page on the #{name} server"] = testPOSTUnknown port
   test["Posting JSON to the #{name} server"] = testPOSTJSON port
   test
@@ -286,7 +296,6 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
-
 
   .export(module)
 
