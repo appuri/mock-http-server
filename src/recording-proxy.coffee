@@ -82,24 +82,24 @@ exports.RecordingProxy = class RecordingProxy
     req.on "data", (chunk) ->
       req.chunks ||= []
       req.chunks.push chunk
-      req.bodyHash ||= crypto.createHash 'sha1'
-      req.bodyHash.update chunk
 
     req.on "end", ->
-      # Calculate filename once the request is finished.
-      bodyHash = req.bodyHash?.digest('hex')
-      req.filename = mock._generateResponseFilename(req.method, req.url, bodyHash)
-
       # Form complete body to send to target
+      bodyHash = null
       if req.chunks
+        bodyHash = crypto.createHash 'sha1'
         totalLength = 0
         for chunk in req.chunks
           totalLength += chunk.length
         req.body = new Buffer(totalLength)
         offset = 0
         for chunk in req.chunks
+          bodyHash.update chunk
           chunk.copy(req.body, offset)
           offset += chunk.length
         delete req.chunks
+        bodyHash = bodyHash.digest('hex')
+      # Calculate filename once the request is finished.
+      req.filename = mock._generateResponseFilename(req.method, req.url, bodyHash)
       sendTargetRequest()
 
