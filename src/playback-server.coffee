@@ -37,8 +37,8 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     # send the response from the file
     req.on "end", =>
       bodyHash = req.bodyHash?.digest('hex')
-      filename = mock._generateResponseFilename(req.method, req.url, bodyHash)
-      @_playbackResponseFromFilename req, res, filename
+      { filename, FILEVERSION } = mock._generateResponseFilename(req.method, req.url, bodyHash)
+      @_playbackResponseFromFilename req, res, filename, FILEVERSION
 
   # When a response has not been recorded, this
   # method will log that to the console and
@@ -64,7 +64,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     res.end()
 
   # Check if file exists and if so parse and send it.
-  _playbackResponseFromFile: (req, res, filename) ->
+  _playbackResponseFromFile: (req, res, filename, fileversion = 0) ->
     filepath = "#{@fixturePath}/#{filename}"
     path.exists filepath, (exists) =>
       if exists
@@ -72,6 +72,8 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
           try
             throw err if err
             recordedResponse = JSON.parse data
+            if (recordedResponse.version || 0) < fileversion
+              throw "Fixture file version was #{recordedResponse.version} expecting #{version}.  Update server."
             if recordedResponse.body64
               recordedResponse.body = new Buffer(recordedResponse.body64, 'base64')
               delete recordedResponse.body64
@@ -86,7 +88,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
   # Determines if request is not recorded or in the cache
   # before loading it from a file.
-  _playbackResponseFromFilename: (req, res, filename) ->
+  _playbackResponseFromFilename: (req, res, filename, fileversion) ->
     if @notfound[filename]
       # We've already had this request but do not have a recorded response
       @_respondWithNotFound req, res, filename
@@ -96,5 +98,5 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
       if recordedResponse
         @_playbackRecordedResponse req, res, recordedResponse
       else
-        @_playbackResponseFromFile req, res, filename
+        @_playbackResponseFromFile req, res, filename, fileversion
 

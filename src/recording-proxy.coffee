@@ -100,6 +100,7 @@ exports.RecordingProxy = class RecordingProxy
         delete req.chunks
         bodyHash = bodyHash.digest('hex')
       # Calculate filename once the request is finished.
-      req.filename = mock._generateResponseFilename(req.method, req.url, bodyHash)
+      { filename, FILEVERSION } = mock._generateResponseFilename(req.method, req.url, bodyHash)
+      req.filename 
       sendTargetRequest()
 

@@ -4,6 +4,8 @@ querystring   = require 'querystring'
 recording     = require '../src/recording-proxy'
 playback      = require '../src/playback-server'
 
+FILEVERSION = 1
+
 exports.createRecordingProxyServer = (options) ->
   recordingProxy = new recording.RecordingProxy(options)
   handler = (req, res) -> recordingProxy.proxyRequest(req, res)
@@ -30,4 +32,4 @@ exports._generateResponseFilename = (method, url, hash) ->
     filename += '-'
     filename += hash
   filename += '.response'
-  filename
+  { filename, FILEVERSION }
