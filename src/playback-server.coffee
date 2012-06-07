@@ -64,7 +64,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     res.end()
 
   # Check if file exists and if so parse and send it.
-  _playbackResponseFromFile: (req, res, filename, fileversion = 0) ->
+  _playbackResponseFromFile: (req, res, filename, minimumFileversion) ->
     filepath = "#{@fixturePath}/#{filename}"
     path.exists filepath, (exists) =>
       if exists
@@ -72,8 +72,9 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
           try
             throw err if err
             recordedResponse = JSON.parse data
-            if (recordedResponse.version || 0) < fileversion
-              throw "Fixture file version was #{recordedResponse.version} expecting #{version}.  Update server."
+            actualFileversion = recordedResponse.fileversion || 0
+            if actualFileversion < minimumFileversion
+              throw "Fixture file version was #{actualFileversion} expecting #{minimumFileversion}.  Update server with latest code."
             if recordedResponse.body64
               recordedResponse.body = new Buffer(recordedResponse.body64, 'base64')
               delete recordedResponse.body64

@@ -59,6 +59,7 @@ exports.RecordingProxy = class RecordingProxy
         # Save recorded data to file
         recordingData =
           filepath: req.filename
+          fileversion: req.fileversion
           method: req.method
           target: self.target
           uri: outgoing.uri
@@ -101,6 +102,7 @@ exports.RecordingProxy = class RecordingProxy
         bodyHash = bodyHash.digest('hex')
       # Calculate filename once the request is finished.
       { filename, FILEVERSION } = mock._generateResponseFilename(req.method, req.url, bodyHash)
-      req.filename 
+      req.filename = filename
+      req.fileversion = FILEVERSION
       sendTargetRequest()
 
