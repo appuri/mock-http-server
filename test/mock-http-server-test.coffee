@@ -16,7 +16,7 @@ https     = require 'https'
 helpers   = require '../test/helpers'
 mock      = require '../src/mock-http-server'
 
-{responseWrapper, testHTTPRunning, requestOptions, postJSONOptions} = helpers
+{responseWrapper, testHTTPRunning, requestOptions, postJSONOptions, serialTest} = helpers
 {createRecordingProxyServer, createPlaybackServer} = mock
 
 HOSTNAME      = '127.0.0.1'
@@ -70,12 +70,9 @@ respondToGETRequest = (req, res) ->
       res.writeHead 500, "Content-Type": "text/plain"
       res.write "Server Error Test"
     when '/checkhost'
-      expectedHost = "#{HOSTNAME}:#{HTTPPORT}"
-      if req.headers.host == expectedHost
-        res.writeHead 200, "Content-Type": "text/plain"
-      else
-        res.writeHead 500, "Content-Type": "text/plain"
-        res.write("host should be #{expectedHost}")
+      hostname = req.headers.host.split(':')[0]
+      res.writeHead 200, "Content-Type": "text/plain"
+      res.write hostname
     else
       writeUnknownRequest res
   res.end()
@@ -225,6 +222,30 @@ testPOSTJSON = (port) ->
       assert.equal results.headers['content-type'], "application/json"
       assert.deepEqual JSON.parse(results.body), { posttest: true }
 
+testGEThost = (port) ->
+  return {
+    topic: ->
+      callback = @callback
+      serialTest
+        firsthost: ->
+          options = requestOptions(HOSTNAME, port, '/checkhost')
+          options.headers =
+            'Host': 'firsthost'
+          http.request(options, responseWrapper(this)).end()
+        secondhost: ->
+          options = requestOptions(HOSTNAME, port, '/checkhost')
+          options.headers =
+            'Host': 'secondhost'
+          http.request(options, responseWrapper(this)).end()
+        end: (results) -> callback null, results
+        catch: (err) -> throw err
+      return
+    'should return results for the first host': ({firsthost}) ->
+      assert.equal firsthost.body.toString('utf8'), 'firsthost'
+    'should return results for the second host': ({secondhost}) ->
+      assert.equal secondhost.body.toString('utf8'), 'secondhost'
+  }
+
 
 #
 # Parameterized Batch
@@ -243,6 +264,7 @@ createTestBatch = (name, port) ->
   test["Getting a URL that results in a error from the #{name} server"] = testGETServerError port
   test["Posting to an unknown page on the #{name} server"] = testPOSTUnknown port
   test["Posting JSON to the #{name} server"] = testPOSTJSON port
+  test["Getting the same path from different hosts on #{name} server"] = testGEThost port
   test
 
 #
@@ -282,7 +304,6 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
     )
 
   .addBatch
-    'Verifying the host in the HTTP headers from the proxy': testGET(PROXYPORT, '/checkhost')
     'Getting secure data from the HTTPS server via the proxy': testGET(PROXYPORT, '/secure', 200,
       'should respond with JSON data': (results) ->
         assert.equal results.headers['content-type'], "application/json"

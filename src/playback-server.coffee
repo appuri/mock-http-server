@@ -37,7 +37,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     # send the response from the file
     req.on "end", =>
       bodyHash = req.bodyHash?.digest('hex')
-      { filename, FILEVERSION } = mock._generateResponseFilename(req.method, req.url, bodyHash)
+      { filename, FILEVERSION } = mock._generateResponseFilename(req, bodyHash)
       @_playbackResponseFromFilename req, res, filename, FILEVERSION
 
   # When a response has not been recorded, this
@@ -49,7 +49,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
         if _.isEmpty(@notfound)
           console.log "Unrecorded requests:"
         @notfound[filename] = true
-        console.log " #{req.method} #{req.url}"
+        console.log " #{req.method} #{req.headers?.host || 'localhost'}#{req.url}"
     res.writeHead 404
     res.end()
 

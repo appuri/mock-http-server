@@ -22,11 +22,15 @@ exports.createPlaybackServer = (options) ->
   server.listen(options.port)
   server
 
-exports._generateResponseFilename = (method, url, hash) ->
-  # Start with the method name
-  filename = method
-  # Followed by the path with dangerous characters stripped
-  filename += querystring.escape(url.replace(/[\/.:\\?&\[\]'"= ]+/g, '-'))
+exports._generateResponseFilename = (req, hash) ->
+  { method, url } = req
+  host = ''
+  if req.headers?.host
+    host = req.headers.host.split(':')[0]
+
+  # Dangerous characters stripped
+  filename = querystring.escape("#{method}-#{url}-#{host}".replace(/[\/.:\\?&\[\]'"= ]+/g, '-'))
+  
   # Append the hash of the body
   if hash
     filename += '-'

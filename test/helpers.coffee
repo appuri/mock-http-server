@@ -66,3 +66,18 @@ postJSONOptions = exports.postJSONOptions = (host, port, path = '/', params) ->
   options = requestOptions host, port, path, 'POST'
   body = if params? then JSON.stringify params else ''
   postOptions options, body
+
+serialTest = exports.serialTest = (spec) ->
+  res = {}
+  steps = ({key, func} for key, func of spec when key != 'catch')
+  resultsKey = null
+  next = (err, args...) ->
+    return spec.catch(err) if err
+    res[resultsKey] = args[0] if resultsKey and args[0]?
+    if steps.length > 0
+      {key, func} = steps.shift()
+      resultsKey = key
+      func.call(next, res) 
+  next null
+  return
+

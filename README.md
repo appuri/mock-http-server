@@ -21,7 +21,7 @@ been recorded or will return a 404 and display the verb and path on the console 
 Requirements
 ============
 
-`mock-http-server` requires Node 0.6.0+ and NPM.  It has been tested on 0.6.15.
+`mock-http-server` requires Node 0.6.0+ and NPM.  It has been tested on 0.6.15+.
 
 Setup
 =====
@@ -53,7 +53,7 @@ Example:
 
     [Start the Recording Proxy]
 
-    ./bin/mock-http-proxy 9000 --record=www.google.com
+    ./bin/mock-http-server 9000 --record=www.google.com
     Running in recording mode
       Recording calls to www.google.com
       Fixtures directory: ./fixtures
@@ -81,9 +81,12 @@ Example:
 
     [Start the Playback Server]
 
-    ./bin/mock-http-proxy 9000
+    ./bin/mock-http-server 9000
     curl http://localhost:9000
     (HTTP response)
 
     [Stop the Playback Server with Ctrl+C]
 
+Usage:
+
+    ./bin/mock-http-server --help
