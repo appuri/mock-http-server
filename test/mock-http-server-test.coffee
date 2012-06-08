@@ -29,16 +29,17 @@ HTTPSPORT     = 7774  # Target HTTPS server
 # Binary data used for testing large HTTP response bodies
 #
 
-createBinaryImageData = ->
-  size = 1 * 1024 * 1024
+createBinaryImageData = (size, offset = 0, mod = 256)->
   data = new Buffer(size)
   i = 0
   while i < size
-    data.writeUInt8((i % 256), i)
+    val = (i % mod) + offset
+    data.writeUInt8(val, i)
     i++
   data
 
-TEST_IMAGE_DATA = createBinaryImageData()
+TEST_IMAGE_DATA = createBinaryImageData(1 * 1024 * 1024)
+TEST_LARGE_PATH = "/large?data=" + createBinaryImageData(1024, 65, 26).toString('ascii')
 
 #
 # A simple HTTP server that is used as the target
@@ -50,13 +51,15 @@ TEST_IMAGE_DATA = createBinaryImageData()
 writeUnknownRequest = (res) -> res.writeHead 404
 
 respondToGETRequest = (req, res) ->
-  switch req.url
+  [path, query] = req.url.split('?')
+  switch path
     when '/'
       res.writeHead 200, "Content-Type": "text/plain"
     when '/texttest'
       res.writeHead 200, "Content-Type": "text/plain"
       res.write "texttest"
-    when '/jsontest/?param=test'
+    when '/jsontest'
+      assert.equal query, "param=test"
       res.writeHead 200, "Content-Type": "application/json"
       res.write JSON.stringify({ jsontest: true })
     when '/imagetest'
@@ -69,6 +72,9 @@ respondToGETRequest = (req, res) ->
     when '/server-error'
       res.writeHead 500, "Content-Type": "text/plain"
       res.write "Server Error Test"
+    when '/large'
+      assert.equal req.url, TEST_LARGE_PATH
+      res.writeHead 200, "Content-Type": "text/plain"
     when '/checkhost'
       hostname = req.headers.host.split(':')[0]
       res.writeHead 200, "Content-Type": "text/plain"
@@ -202,7 +208,7 @@ testGETText = (port) ->
       assert.equal results.headers['content-type'], "text/plain"
       assert.equal results.body, 'texttest'
 testGETJSON = (port) -> 
-  testGET port, '/jsontest/?param=test', 200,
+  testGET port, '/jsontest?param=test', 200,
     'should respond with JSON data': (results) ->
       assert.equal results.headers['content-type'], "application/json"
       assert.deepEqual JSON.parse(results.body), { jsontest: true }
@@ -262,9 +268,10 @@ createTestBatch = (name, port) ->
   test["Getting an image from the #{name} server"] = testGETImage port
   test["Getting a URL that is not modified from the #{name} server"] = testGETNotModified port
   test["Getting a URL that results in a error from the #{name} server"] = testGETServerError port
+  test["Getting the same path from different hosts on #{name} server"] = testGEThost port
+  test["Getting a large path the #{name} server"] = testGET port, TEST_LARGE_PATH, 200
   test["Posting to an unknown page on the #{name} server"] = testPOSTUnknown port
   test["Posting JSON to the #{name} server"] = testPOSTJSON port
-  test["Getting the same path from different hosts on #{name} server"] = testGEThost port
   test
 
 #

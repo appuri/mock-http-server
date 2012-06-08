@@ -1,5 +1,6 @@
 http          = require 'http'
 https         = require 'https'
+crypto        = require 'crypto'
 querystring   = require 'querystring'
 recording     = require '../src/recording-proxy'
 playback      = require '../src/playback-server'
@@ -24,6 +25,13 @@ exports.createPlaybackServer = (options) ->
 
 exports._generateResponseFilename = (req, hash) ->
   { method, url } = req
+
+  if url.length > 100
+    # Hash URL if it is too long
+    urlHash = crypto.createHash 'sha1'
+    urlHash.update url
+    url = urlHash.digest('hex')
+
   host = ''
   if req.headers?.host
     host = req.headers.host.split(':')[0]
