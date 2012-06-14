@@ -28,7 +28,7 @@ exports.RecordingProxy = class RecordingProxy
       filepath = "#{self.fixturePath}/#{req.filename}"
 
       logErrorToConsole = (error) ->
-        console.log "Error writing request #{req.method} #{req.url} to #{filepath}"
+        console.log "Error with request #{req.method} #{req.url} to #{filepath}"
         console.log error
         res.writeHead 500, "Content-Type": "text/plain"
         res.write error.toString()
@@ -56,8 +56,14 @@ exports.RecordingProxy = class RecordingProxy
       target = validateTarget req
       return unless target
 
+      validateRequestPath = ->
+        requestPath = url.parse(req.url)
+        path = requestPath.path
+        path += requestPath.hash if requestPath.hash
+        path
+
       outgoing =
-        uri: "#{target}#{req.url}"
+        uri: "#{target}#{validateRequestPath(req.url)}"
         method: req.method
         headers: req.headers
         body: req.body
@@ -68,7 +74,14 @@ exports.RecordingProxy = class RecordingProxy
 
       # Issue request to target
       request outgoing, (error, response, body) ->
-        return logErrorToConsole(error) if error
+        if error
+          console.log "HTTP Error"
+          console.log outgoing
+          console.log "response"
+          console.log response
+          console.log "body"
+          console.log body
+          return logErrorToConsole(error)
 
         # Remove HTTP 1.1 headers for HTTP 1.0
         delete response.headers["transfer-encoding"] if req.httpVersion == "1.0"

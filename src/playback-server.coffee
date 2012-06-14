@@ -49,7 +49,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
         if _.isEmpty(@notfound)
           console.log "Unrecorded requests:"
         @notfound[filename] = true
-        console.log " #{req.method} #{req.headers?.host || 'localhost'}#{req.url}"
+        console.log " #{req.method} #{req.headers?.host || 'localhost'} #{req.url}"
     res.writeHead 404
     res.end()
 
