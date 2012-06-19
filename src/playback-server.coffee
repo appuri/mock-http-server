@@ -18,8 +18,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     # Store previous requests that were not recorded
     @notfound = {}
     # Directory to store fixtures
-    fixtureDir = options.fixtures || 'fixtures'
-    @fixturePath = "#{__dirname}/../#{fixtureDir}"
+    @fixturesPath = mock._generateFixturesPath(options.fixtures)
 
   # Called once for each request that comes into the HTTP server.
   playbackRequest: (req, res) ->
@@ -48,8 +47,13 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
       unless @notfound[filename]
         if _.isEmpty(@notfound)
           console.log "Unrecorded requests:"
+          console.log " Fixtures Path: #{@fixturesPath}"
         @notfound[filename] = true
-        console.log " #{req.method} #{req.headers?.host || 'localhost'} #{req.url}"
+        # Debug data
+        console.log " Method: #{req.method}"
+        console.log " Host: #{req.headers?.host || 'localhost'}"
+        console.log " Path: #{req.url}"
+        console.log " Filename: #{filename}"
     res.writeHead 404
     res.end()
 
@@ -65,7 +69,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
   # Check if file exists and if so parse and send it.
   _playbackResponseFromFile: (req, res, filename, minimumFileversion) ->
-    filepath = "#{@fixturePath}/#{filename}"
+    filepath = "#{@fixturesPath}/#{filename}"
     path.exists filepath, (exists) =>
       if exists
         fs.readFile filepath, (err, data) =>

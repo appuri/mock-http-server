@@ -16,16 +16,15 @@ exports.RecordingProxy = class RecordingProxy
     @target = options.target
 
     # Set up directory
-    fixtureDir = options.fixtures || 'fixtures'
-    @fixturePath = "#{__dirname}/../#{fixtureDir}"
-    fs.mkdirSync @fixturePath unless path.existsSync @fixturePath
+    @fixturesPath = mock._generateFixturesPath(options.fixtures)
+    fs.mkdirSync @fixturesPath unless path.existsSync @fixturesPath
 
   # Called once for each request to the HTTP server.
   proxyRequest: (req, res) ->
     self = @
 
     sendTargetRequest = ->
-      filepath = "#{self.fixturePath}/#{req.filename}"
+      filepath = "#{self.fixturesPath}/#{req.filename}"
 
       logErrorToConsole = (error) ->
         console.log "Error with request #{req.method} #{req.url} to #{filepath}"

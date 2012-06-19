@@ -23,6 +23,9 @@ exports.createPlaybackServer = (options) ->
   server.listen(options.port)
   server
 
+exports._generateFixturesPath = (fixtures) ->
+  return if fixtures[0] == '/' then fixtures else "#{__dirname}/../#{fixtures}"
+
 exports._generateResponseFilename = (req, hash) ->
   { method, url } = req
 

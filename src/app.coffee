@@ -91,5 +91,5 @@ else
   # See playback-server.coffee
   createPlaybackServer options
 
-console.log "  Fixtures directory: ./#{fixtures}"
+console.log "  Fixtures directory: #{fixtures}"
 console.log "  Listening at http://localhost:#{port}/"
