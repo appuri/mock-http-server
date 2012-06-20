@@ -13,7 +13,7 @@ exports.createRecordingProxyServer = (options) ->
   handler = (req, res) -> recordingProxy.proxyRequest(req, res)
   server = (if options.https then https.createServer(options.https, handler) else http.createServer(handler))
   server.recordingProxy = recordingProxy
-  server.listen(options.port)
+  server.listen(options.port, options.bind)
   server
 
 exports.createPlaybackServer = (options) ->
@@ -21,7 +21,7 @@ exports.createPlaybackServer = (options) ->
   handler = (req, res) -> playbackServer.playbackRequest(req, res)
   server = (if options.https then https.createServer(options.https, handler) else http.createServer(handler))
   server.playbackServer = playbackServer
-  server.listen(options.port)
+  server.listen(options.port, options.bind)
   server
 
 exports._generateFixturesPath = (fixtures) ->

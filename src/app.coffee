@@ -19,7 +19,10 @@ help = ->
     """
     Usage: #{exe} port [options]
 
-      Where port is to listen on for incoming requests
+      Where port is to listen on for incoming requests.
+      Port can either be a stand-alone port and #{exe}
+      will listen on IPADDR_ANY or a host:port pair and
+      #{exe} will be bound to the host.
     
     Options:
     
@@ -65,7 +68,16 @@ if argv.help or argv._.length < 1
   help()
   process.exit 1
 
-port = parseInt(argv._[0])
+bind = '0.0.0.0'
+ipport = argv._[0]
+if ipport.toString().match(/:/)
+  ipport = ipport.split(':')
+  bind = ipport[0]
+  port = parseInt(ipport[1])
+else
+  port = parseInt(ipport)
+
+
 if not port? || port == 0
   console.log "Error: must specify a port"
   help()
@@ -74,7 +86,7 @@ if not port? || port == 0
 fixtures = argv.fixtures || DEFAULT_FIXTURES
 record = argv.record
 
-options = { port, fixtures }
+options = { bind, port, fixtures }
 if record?
   console.log "Running in recording mode"
   if record == true
@@ -92,4 +104,4 @@ else
   createPlaybackServer options
 
 console.log "  Fixtures directory: #{fixtures}"
-console.log "  Listening at http://localhost:#{port}/"
+console.log "  Listening at http://#{bind}:#{port}/"
