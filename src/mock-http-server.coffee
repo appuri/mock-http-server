@@ -6,7 +6,7 @@ querystring   = require 'querystring'
 recording     = require '../src/recording-proxy'
 playback      = require '../src/playback-server'
 
-FILEVERSION = 1
+FILEVERSION = 2
 
 exports.createRecordingProxyServer = (options) ->
   recordingProxy = new recording.RecordingProxy(options)
@@ -30,13 +30,13 @@ exports._generateFixturesPath = (fixtures) ->
 exports._generateResponseFilename = (req, hash) ->
   requestPath = url.parse(req.url)
   path = requestPath.path
-  path += requestPath.hash if requestPath.hash
 
   if path.length > 100
-    # Hash URL if it is too long
-    pathHash = crypto.createHash 'sha1'
-    pathHash.update path
-    path = pathHash.digest('hex')
+    # Hash URL query parameters if the path is too long
+    searchHash = crypto.createHash 'sha1'
+    searchHash.update requestPath.search
+    sha1min = searchHash.digest('hex')[0...6]
+    path = "#{requestPath.pathname}-#{sha1min}"
 
   host = ''
   if req.headers?.host
@@ -50,4 +50,5 @@ exports._generateResponseFilename = (req, hash) ->
     filename += '-'
     filename += hash
   filename += '.response'
-  { filename, FILEVERSION }
+  { filename, FILEVERSION, path }
+
