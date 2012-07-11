@@ -15,15 +15,18 @@ https     = require 'https'
 {_}       = require 'underscore'
 helpers   = require '../test/helpers'
 mock      = require '../src/mock-http-server'
+net       = require 'net'
 
 {responseWrapper, testHTTPRunning, requestOptions, postJSONOptions, serialTest} = helpers
 {createRecordingProxyServer, createPlaybackServer} = mock
 
-HOSTNAME      = '127.0.0.1'
-HTTPPORT      = 7771  # Target HTTP server
-PROXYPORT     = 7772  # Recording Proxy Server
-PLAYBACKPORT  = 7773  # Playback HTTP server
-HTTPSPORT     = 7774  # Target HTTPS server
+HOSTNAME        = '127.0.0.1'
+HTTPPORT        = 7771  # Target HTTP server
+PROXYPORT       = 7772  # Recording Proxy Server
+PLAYBACKPORT    = 7773  # Playback HTTP server
+HTTPSPORT       = 7774  # Target HTTPS server
+THROTTLEPORT    = 7775  # Proxy that is being throttled
+ECONNRESETPORT  = 7776  # Raw TCP port that does an ECONNRESET to throttle requests
 
 #
 # Binary data used for testing large HTTP response bodies
@@ -75,6 +78,8 @@ respondToGETRequest = (req, res) ->
     when '/large'
       assert.equal req.url, TEST_LARGE_PATH
       res.writeHead 200, "Content-Type": "text/plain"
+    when '/1secdelay'
+      setTimeout((-> res.writeHead 200), 1000)
     when '/checkhost'
       hostname = req.headers.host.split(':')[0]
       res.writeHead 200, "Content-Type": "text/plain"
@@ -120,6 +125,19 @@ http.createServer((req, res) ->
 ).listen HTTPPORT, HOSTNAME
 
 #
+# Throttling server
+# This server mimics an HTTP server that throttles requests
+# by resetting the socket connection via ECONNRESET
+#
+createThrottlingServer = (countdown) ->
+  throttleHandler = (socket) ->
+    if --countdown > 0
+      socket.destroy()
+    socket.end("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 5\r\n\r\nhello", 'utf8')
+  net.createServer(throttleHandler).listen(ECONNRESETPORT)
+createThrottlingServer(9)
+
+#
 # Create an HTTPS server to test redirects
 #
 
@@ -159,6 +177,19 @@ playbackServerOptions =
 createPlaybackServer playbackServerOptions
 
 #
+# Throttled Proxy Server
+# Tests proxying to a service that does throttling via ECONNRESET
+#
+
+throttlingProxyOptions =
+  port: THROTTLEPORT                  # port to listen on
+  fixtures: 'test/fixtures'           # directory where the fixture files are
+  target: "#{HOSTNAME}:#{ECONNRESETPORT}"   # target will throttle requests
+  retryTimeout: 1000
+  retryMaxBackoff: 100
+createRecordingProxyServer throttlingProxyOptions
+
+#
 # Test Macros
 #
 
@@ -193,6 +224,32 @@ testImage = (port, path, statusCode, vows) ->
 testPOST = (port, path, params, statusCode, vows = {}) ->
   topic = -> postRequest port, path, params, @callback
   testRequest topic, statusCode, vows
+testMGET = (port, path, requests, vows) ->
+  test = {
+    topic: ->
+      callback = @callback
+      error = null
+      results = []
+      outstandingRequests = 0      
+      countdownLatch = (err, res) ->
+        if err
+          error = err
+        else if res.statusCode != 200
+          error = "Expected status code 200 but received #{res.statusCode}"
+        results.push(res) if res
+        if --outstandingRequests == 0
+          callback(error, results)
+      addOutstandingRequest = ->
+        outstandingRequests++
+        getRequest port, path, countdownLatch
+      i = 0
+      while i < requests
+        addOutstandingRequest()
+        i++
+      return
+  }
+  _(test).extend vows
+
 
 
 #
@@ -304,19 +361,34 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
   # Additional server-specific tests for edge cases
   #
 
+  #
+  # Special tests for direct web server
+  #
   .addBatch
     'Getting secure data from the HTTP server': testGET(HTTPPORT, '/secure', 302,
       'should contain a location header': (results) ->
         assert.equal results.headers.location, "https://#{HOSTNAME}:#{HTTPSPORT}/secure"
     )
 
+  #
+  # Special tests for the recording proxy
+  #
   .addBatch
     'Getting secure data from the HTTPS server via the proxy': testGET(PROXYPORT, '/secure', 200,
       'should respond with JSON data': (results) ->
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
+    'Sending many requests to a server': testMGET(PROXYPORT, '/1secdelay', 250,
+      'should return without error': (error, results) ->
+        assert.isNull error
+        for result in results
+          assert.equal result.statusCode, 200
+    )
 
+  #
+  # Special tests for the playback server
+  #
   .addBatch
     'Getting an unrecorded page from the playback server': testGET PLAYBACKPORT, '/was-not-recorded', 404
     'Getting secure data from the playback server': testGET(PLAYBACKPORT, '/secure', 200,
@@ -324,6 +396,12 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
+
+  #
+  # Special tests
+  #
+  .addBatch
+    'Sending a request to a mock throttled server': testGET THROTTLEPORT, '/throttle', 200
 
   .export(module)
 

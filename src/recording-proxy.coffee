@@ -11,9 +11,14 @@ querystring = require 'querystring'
 request     = require 'request'
 mock        = require '../src/mock-http-server'
 
+RETRY_TIMEOUT     = 30000 # Time in seconds before responding to original request
+RETRY_MAX_BACKOFF = 3000  # Max time in seconds to randomize request retry
+
 exports.RecordingProxy = class RecordingProxy
   constructor: (@options = {}) ->
     @target = options.target
+    @retryTimeout = @options.retryTimeout || RETRY_TIMEOUT
+    @retryMaxBackoff = @options.retryMaxBackoff || RETRY_MAX_BACKOFF
 
     # Set up directory
     @fixturesPath = mock._generateFixturesPath(options.fixtures)
@@ -68,41 +73,56 @@ exports.RecordingProxy = class RecordingProxy
         body: req.body
         encoding: null
         jar: false
+        sentAt: (new Date()).getTime()
 
       delete outgoing.headers.host if isLocalHost(outgoing.headers?.host)
 
       # Issue request to target
-      request outgoing, (error, response, body) ->
-        if error
-          console.log "HTTP Error"
-          console.log outgoing
-          console.log "response"
-          console.log response
-          console.log "body"
-          console.log body
-          return logErrorToConsole(error)
+      sendOutgoingRequest = ->
+        request outgoing, (error, response, body) ->
+          if error
+            resendOutgoingRequest = ->
+              timeNow = (new Date()).getTime()
+              randomDelay = Math.random() * self.retryMaxBackoff
+              retryTime = timeNow - outgoing.sentAt + randomDelay
+              timedOut = retryTime > self.retryTimeout
+              return false if timedOut
+              setTimeout(sendOutgoingRequest, randomDelay)
+              return true
 
-        # Remove HTTP 1.1 headers for HTTP 1.0
-        delete response.headers["transfer-encoding"] if req.httpVersion == "1.0"
+            if error.code == 'ECONNRESET' and resendOutgoingRequest()
+              return # the request will be reissued after a delay
+            else
+              console.log "HTTP Error"
+              console.log outgoing
+              console.log "response"
+              console.log response
+              console.log "body"
+              console.log body
+              return logErrorToConsole(error)
 
-        # Save recorded data to file
-        recordingData =
-          filepath: req.filename
-          fileversion: req.fileversion
-          method: req.method
-          target: target
-          uri: outgoing.uri
-          statusCode: response.statusCode
-          headers: response.headers
-          host: outgoing?.headers?.host
-        recordingData.body64 = response.body.toString('base64') if response.body
+          # Remove HTTP 1.1 headers for HTTP 1.0
+          delete response.headers["transfer-encoding"] if req.httpVersion == "1.0"
 
-        recordingJSON = JSON.stringify(recordingData, true, 2)
-        fs.writeFile filepath, recordingJSON, (error) ->
-          return logErrorToConsole(error) if error
-          res.writeHead response.statusCode, response.headers
-          res.write(body) if body
-          res.end()
+          # Save recorded data to file
+          recordingData =
+            filepath: req.filename
+            fileversion: req.fileversion
+            method: req.method
+            target: target
+            uri: outgoing.uri
+            statusCode: response.statusCode
+            headers: response.headers
+            host: outgoing?.headers?.host
+          recordingData.body64 = response.body.toString('base64') if response.body
+
+          recordingJSON = JSON.stringify(recordingData, true, 2)
+          fs.writeFile filepath, recordingJSON, (error) ->
+            return logErrorToConsole(error) if error
+            res.writeHead response.statusCode, response.headers
+            res.write(body) if body
+            res.end()
+      sendOutgoingRequest()
 
     # When receiving data from the client, save the
     # request body from the client so that we can reissue
