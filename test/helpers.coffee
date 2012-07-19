@@ -25,16 +25,11 @@ responseWrapper = exports.responseWrapper = (handler, encoding) ->
         body: concatenateData()
       handler null, result
 
-testHTTPRunning = exports.testHTTPRunning = (message, port=80, hostname='localhost') ->
+testHTTPRunning = exports.testHTTPRunning = (message, port=80, host='localhost') ->
   {
     topic: ->
       callback = @callback
-      client = http.createClient port, hostname
-      client.on 'error', (error) ->
-        callback error, null
-      req = client.request 'GET', '/'
-      req.on 'response', responseWrapper(@callback)
-      req.end()
+      http.get({host, port}, responseWrapper(callback)).on('error', ((e)-> callback(e, null)))
       return
 
     'should be running': (error, response) ->
