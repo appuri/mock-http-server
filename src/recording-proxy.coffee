@@ -73,12 +73,12 @@ exports.RecordingProxy = class RecordingProxy
         body: req.body
         encoding: null
         jar: false
-        sentAt: (new Date()).getTime()
 
       delete outgoing.headers.host if isLocalHost(outgoing.headers?.host)
 
       # Issue request to target
       sendOutgoingRequest = ->
+        outgoing.sentAt = (new Date()).getTime()
         request outgoing, (error, response, body) ->
           if error
             resendOutgoingRequest = ->
@@ -114,6 +114,7 @@ exports.RecordingProxy = class RecordingProxy
             statusCode: response.statusCode
             headers: response.headers
             host: outgoing?.headers?.host
+            latency: (new Date()).getTime() - outgoing.sentAt
           recordingData.body64 = response.body.toString('base64') if response.body
 
           recordingJSON = JSON.stringify(recordingData, true, 2)
