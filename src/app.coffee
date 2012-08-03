@@ -32,6 +32,8 @@ help = ->
            Record results to host:port
       --fixtures=directory
            store files relative to cwd (default ./#{DEFAULT_FIXTURES})
+      --simulator=file
+           request simulator script
     
     
     Usage:
@@ -84,9 +86,10 @@ if not port? || port == 0
   process.exit 1
 
 fixtures = argv.fixtures || DEFAULT_FIXTURES
+simulator = argv.simulator
 record = argv.record
 
-options = { bind, port, fixtures }
+options = { bind, port, fixtures, simulator }
 if record?
   console.log "Running in recording mode"
   if record == true

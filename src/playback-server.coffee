@@ -9,6 +9,8 @@ path        = require 'path'
 crypto      = require 'crypto'
 {_}         = require 'underscore'
 mock        = require '../src/mock-http-server'
+simulator   = require '../src/request-simulator'
+url         = require 'url'
 
 exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
@@ -19,6 +21,23 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     @notfound = {}
     # Directory to store fixtures
     @fixturesPath = mock._generateFixturesPath(options.fixtures)
+
+    @loadSimulator options.simulator
+
+  # if specified, load request simulator script
+  loadSimulator: (simulatorPath) ->
+    console.log "  Simulator: #{simulatorPath || 'none'}"
+    if simulatorPath
+      try
+        @simulator = new simulator.RequestSimulator()
+
+        # load the simulator script
+        # the script should make register() calls on the passed-in simulator object
+        require(simulatorPath)(@simulator)
+        console.log "             loaded successfully with #{@simulator.router.routes.length} rules"
+      catch e
+        # continue gracefully if the simulator file has errors
+        console.error "             #{e}"
 
   # Called once for each request that comes into the HTTP server.
   playbackRequest: (req, res) ->
@@ -70,7 +89,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
   # Check if file exists and if so parse and send it.
   _playbackResponseFromFile: (req, res, filename, minimumFileversion) ->
     filepath = "#{@fixturesPath}/#{filename}"
-    path.exists filepath, (exists) =>
+    fs.exists filepath, (exists) =>
       if exists
         fs.readFile filepath, (err, data) =>
           try
@@ -89,7 +108,27 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
             res.writeHead 500
             res.end()
       else
-        @_respondWithNotFound req, res, filename
+        # Try serving the request using the simulator
+        if @simulator
+          requestPath = url.parse(req.url)
+          path = requestPath.path
+          self = this
+
+          # respondTo returns true if the simulator can handle the request
+          handled = @simulator.respondTo path, req.method, (data) ->
+            # serve data returned by the simulator
+            recordedResponse = JSON.parse data
+            if recordedResponse.body64
+              recordedResponse.body = new Buffer(recordedResponse.body64, 'base64')
+              delete recordedResponse.body64
+            self._playbackRecordedResponse req, res, recordedResponse
+
+          if !handled
+            @_respondWithNotFound req, res, filename
+
+        else
+          @_respondWithNotFound req, res, filename
+
 
   # Determines if request is not recorded or in the cache
   # before loading it from a file.

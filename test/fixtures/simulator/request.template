@@ -1,0 +1,11 @@
+{
+  "method": "GET",
+  "statusCode": 200,
+  "headers": {
+    "content-type": "application/json",
+    "date": "Thu, 02 Aug 2012 23:44:56 GMT",
+    "connection": "keep-alive",
+    "transfer-encoding": "chunked"
+  },
+  "body": "{\"product\":\"{{productName}}\", \"userid\": {{user_id}} }"
+}

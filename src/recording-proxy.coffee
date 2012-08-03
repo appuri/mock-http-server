@@ -22,7 +22,7 @@ exports.RecordingProxy = class RecordingProxy
 
     # Set up directory
     @fixturesPath = mock._generateFixturesPath(options.fixtures)
-    fs.mkdirSync @fixturesPath unless path.existsSync @fixturesPath
+    fs.mkdirSync @fixturesPath unless fs.existsSync @fixturesPath
 
   # Called once for each request to the HTTP server.
   proxyRequest: (req, res) ->
