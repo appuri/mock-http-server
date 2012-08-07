@@ -11,6 +11,7 @@ crypto      = require 'crypto'
 mock        = require '../src/mock-http-server'
 simulator   = require '../src/request-simulator'
 url         = require 'url'
+path        = require 'path'
 
 exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
@@ -111,11 +112,11 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
         # Try serving the request using the simulator
         if @simulator
           requestPath = url.parse(req.url)
-          path = requestPath.path
+          pathname = path.normalize requestPath.pathname
           self = this
 
           # respondTo returns true if the simulator can handle the request
-          handled = @simulator.respondTo path, req.method, (data) ->
+          handled = @simulator.respondTo pathname, req.method, (data) ->
             # serve data returned by the simulator
             recordedResponse = JSON.parse data
             if recordedResponse.body64
@@ -125,7 +126,6 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
           if !handled
             @_respondWithNotFound req, res, filename
-
         else
           @_respondWithNotFound req, res, filename
 
