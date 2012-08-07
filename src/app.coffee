@@ -7,6 +7,10 @@ url     = require 'url'
 {argv}  = require 'optimist'
 {_}     = require 'underscore'
 mock    = require '../src/mock-http-server'
+cluster = require 'cluster'
+os      = require 'os'
+
+numCPUs = os.cpus().length
 
 {createRecordingProxyServer, createPlaybackServer} = mock
 
@@ -32,6 +36,8 @@ help = ->
            Record results to host:port
       --fixtures=directory
            store files relative to cwd (default ./#{DEFAULT_FIXTURES})
+      --simulator=file
+           request simulator script
     
     
     Usage:
@@ -84,9 +90,10 @@ if not port? || port == 0
   process.exit 1
 
 fixtures = argv.fixtures || DEFAULT_FIXTURES
+simulator = argv.simulator
 record = argv.record
 
-options = { bind, port, fixtures }
+options = { bind, port, fixtures, simulator }
 if record?
   console.log "Running in recording mode"
   if record == true
@@ -101,7 +108,16 @@ if record?
 else
   console.log "Running in playback mode"
   # See playback-server.coffee
-  createPlaybackServer options
+  if cluster.isMaster
+    # Fork workers.
+    i = 0
+    while i < numCPUs
+      cluster.fork()
+      i++
+  else
+    # Workers can share any TCP connection
+    # In this case its a HTTP server
+    createPlaybackServer options
 
 console.log "  Fixtures directory: #{fixtures}"
 console.log "  Listening at http://#{bind}:#{port}/"

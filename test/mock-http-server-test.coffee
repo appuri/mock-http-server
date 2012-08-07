@@ -27,6 +27,7 @@ PLAYBACKPORT    = 7773  # Playback HTTP server
 HTTPSPORT       = 7774  # Target HTTPS server
 THROTTLEPORT    = 7775  # Proxy that is being throttled
 ECONNRESETPORT  = 7776  # Raw TCP port that does an ECONNRESET to throttle requests
+PLAYBACKPORT2   = 7777  # Playback HTTP server with simulated requests
 
 #
 # Binary data used for testing large HTTP response bodies
@@ -175,6 +176,18 @@ playbackServerOptions =
   fixtures: 'test/fixtures'   # directory where the fixture files are
   hideUnknownRequests: true   # do not show them on screen during testing
 createPlaybackServer playbackServerOptions
+
+#
+# Playback Server with simulated requests
+# Serves requests captured by Recording Proxy along with rule based simulated requests
+#
+
+playbackServerWithSimulatedRequestsOptions =
+  port: PLAYBACKPORT2         # port to listen on
+  fixtures: 'test/fixtures'   # directory where the fixture files are
+  simulator:'../test/fixtures/simulator/test.js'   # test simulator script
+  hideUnknownRequests: true   # do not show them on screen during testing
+createPlaybackServer playbackServerWithSimulatedRequestsOptions
 
 #
 # Throttled Proxy Server
@@ -345,6 +358,8 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
     'The Recording Proxy Server': testHTTPRunning "ERROR: could not connect to Recording Proxy Server", PROXYPORT
   .addBatch
     'The playback Server': testHTTPRunning "ERROR: could not connect to the Playback Server", PLAYBACKPORT
+  .addBatch
+    'The playback Server with simulated requests': testHTTPRunning "ERROR: could not connect to the Playback Server with simulated requests", PLAYBACKPORT2
 
   #
   # Verify that the HTTP request suite works
@@ -356,6 +371,8 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
   .addBatch(createTestBatch('recording', PROXYPORT))
   # [THIRD] From the playback server
   .addBatch(createTestBatch('playback', PLAYBACKPORT))
+  # [THIRD] From the playback server with simulated requests
+  .addBatch(createTestBatch('playback with simulated requests', PLAYBACKPORT2))
 
   #
   # Additional server-specific tests for edge cases
@@ -397,6 +414,26 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
 
+  #
+  # Special tests for the playback server serving simulated requests
+  #
+  .addBatch
+    'Getting an unrecorded, unsimulated page from the playback server with simulated requests': testGET PLAYBACKPORT2, '/was-not-recorded', 404
+    'Getting secure data from the playback server with simulated requests': testGET(PLAYBACKPORT2, '/secure', 200,
+      'should respond with JSON data': (results) ->
+        assert.equal results.headers['content-type'], "application/json"
+        assert.deepEqual JSON.parse(results.body), { secure: true }
+    )
+    "Getting an unrecorded, simulated page from the playback server with simulated requests": testGET(PLAYBACKPORT2, '/product/300/user/user1', 200,
+      'should respond with JSON data': (results) ->
+        assert.equal results.headers['content-type'], "application/json"
+        assert.deepEqual JSON.parse(results.body), { product:'bacon', userid: 1234 }
+    )
+    "Getting another unrecorded, simulated page from the playback server with simulated requests": testGET(PLAYBACKPORT2, '/product/3000/user/user123', 200,
+      'should respond with JSON data': (results) ->
+        assert.equal results.headers['content-type'], "application/json"
+        assert.deepEqual JSON.parse(results.body), { product:'unknown product 3000', userid: -1 }
+    )
   #
   # Special tests
   #
