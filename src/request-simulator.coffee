@@ -10,6 +10,7 @@ handlebars = require "handlebars"
 exports.RequestSimulator = class RequestSimulator
   constructor: (@options = {}) ->
     @router = new barista.Router
+    @templates = {}
 
   # register()
   #   registers a parameterized path to simulate requests for
@@ -28,6 +29,17 @@ exports.RequestSimulator = class RequestSimulator
       template: template
       dataHandler: dataHandler
 
+    # read and cache templates
+    self = this
+    fs.readFile template, "utf8", (err, templateContents) ->
+      if err
+        console.error "Could not open template file: %s", err
+        process.exit 1
+      try
+        self.templates[template] = handlebars.compile templateContents + ""
+      catch e
+        console.error "Error using template #{template} - #{e}"
+
   # respondTo()
   #   attempts to respond to the given path and http method
   #   returns true if it matches a registed path, false otherwise
@@ -45,17 +57,16 @@ exports.RequestSimulator = class RequestSimulator
 
     return false  unless match  # simulator will not handle this request
 
-    fs.readFile match.template, "utf8", (err, templateContents) ->
-      if err
-        console.error "Could not open template file: %s", err
-        process.exit 1
-      template = handlebars.compile(templateContents + "")
-      if match.dataHandler
-        match.dataHandler match, (processedData) ->
-          callback template(processedData)
+    # get compiled template from cache
+    template = @templates[match.template]
 
-      else
-        callback template(match)
+    if match.dataHandler
+      # allow data handler to process data before applying to template
+      match.dataHandler match, (processedData) ->
+        callback template(processedData)
+
+    else
+      callback template(match)
 
     # simulator will handle this request
     return true
