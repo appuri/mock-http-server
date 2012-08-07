@@ -7,6 +7,10 @@ url     = require 'url'
 {argv}  = require 'optimist'
 {_}     = require 'underscore'
 mock    = require '../src/mock-http-server'
+cluster = require 'cluster'
+os      = require 'os'
+
+numCPUs = os.cpus().length
 
 {createRecordingProxyServer, createPlaybackServer} = mock
 
@@ -104,7 +108,16 @@ if record?
 else
   console.log "Running in playback mode"
   # See playback-server.coffee
-  createPlaybackServer options
+  if cluster.isMaster
+    # Fork workers.
+    i = 0
+    while i < numCPUs
+      cluster.fork()
+      i++
+  else
+    # Workers can share any TCP connection
+    # In this case its a HTTP server
+    createPlaybackServer options
 
 console.log "  Fixtures directory: #{fixtures}"
 console.log "  Listening at http://#{bind}:#{port}/"
