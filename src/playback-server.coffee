@@ -83,6 +83,12 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
   # encoded into base64 for serialization
   _playbackRecordedResponse: (req, res, recordedResponse) ->
     { statusCode, headers, body } = recordedResponse
+    
+    # avoid massive perf problems with connection header set to anything
+    # but 'keep-alive'
+    if headers['connection']
+      delete headers['connection']
+
     res.writeHead statusCode, headers
     res.write(body) if body
     res.end()
