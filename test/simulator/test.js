@@ -1,5 +1,5 @@
 module.exports = function(requestSimulator) {
-  requestSimulator.register( '/product/:id/user/:username', 'test/fixtures/simulator/request.template', 'GET', function(data, callback) {
+  requestSimulator.register( '/product/:id/user/:username', 'test/simulator/request.template', 'GET', function(data, callback) {
     if (data.id == 15 || data.id == 300) 
       data.productName = "bacon"
     else
