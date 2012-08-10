@@ -6,10 +6,11 @@ Generic HTTP Server that can record requests as a proxy and playback as an HTTP 
 Overview
 ========
 
-`mock-http-server` runs in two modes:
+`mock-http-server` runs in these modes:
 
 - Recording Mode
 - Playback Mode
+- Simulator Mode
 
 *Recording Mode* will record all requests to a target server and record the responses.  The 
 request signature forms the filename and is derived from the HTTP verb, the path and sha1 hash 
@@ -18,10 +19,14 @@ of the request body (if present).  The requests are saved in the fixtures direct
 *Playback Mode* will return the request data saved in the fixtures directory if the request has
 been recorded or will return a 404 and display the verb and path on the console output.
 
+*Simulator Mode* will return the request data saved in the fixtures directory if the request has
+been recorded or will pass the request to a simulator file to handle.  The simulator allows templating
+of responses for uses where the data can be algorithmically generated such as load testing.
+
 Requirements
 ============
 
-`mock-http-server` requires Node 0.6.0+ and NPM.  It has been tested on 0.6.15+.
+`mock-http-server` requires Node 0.8.0+ and NPM.  It has been tested on 0.8.2+.
 
 Setup
 =====
@@ -37,7 +42,7 @@ To install a clean version:
 
     git clone <your repo>/mock-http-server.git
     cd mock-http-server
-    npm install -d
+    npm install
 
 This will install necessary NPM modules.
 
@@ -90,3 +95,4 @@ Example:
 Usage:
 
     ./bin/mock-http-server --help
+
