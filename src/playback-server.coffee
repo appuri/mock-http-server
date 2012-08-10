@@ -42,6 +42,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
   # Called once for each request that comes into the HTTP server.
   playbackRequest: (req, res) ->
+    @requestReceivedAt = (new Date()).getTime()
 
     # Set event handlers to calculate sha1 hash of body while it is
     # being sent from the client.
@@ -82,16 +83,22 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
   # in the original chunks sent from the client
   # encoded into base64 for serialization
   _playbackRecordedResponse: (req, res, recordedResponse) ->
-    { statusCode, headers, body } = recordedResponse
+    { statusCode, headers, body, latency } = recordedResponse
     
     # avoid massive perf problems with connection header set to anything
     # but 'keep-alive'
     if headers['connection']
       delete headers['connection']
 
-    res.writeHead statusCode, headers
-    res.write(body) if body
-    res.end()
+    currentTime = (new Date()).getTime()
+    waitForLatency = latency - (currentTime - @requestReceivedAt)
+    waitForLatency = 0 if waitForLatency < 0
+
+    setTimeout -> 
+      res.writeHead statusCode, headers
+      res.write(body) if body
+      res.end()
+    , waitForLatency
 
   # Check if file exists and if so parse and send it.
   _playbackResponseFromFile: (req, res, filename, minimumFileversion) ->
