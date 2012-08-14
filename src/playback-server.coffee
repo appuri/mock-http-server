@@ -130,7 +130,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
             if recordedResponse.body64
               recordedResponse.body = new Buffer(recordedResponse.body64, 'base64')
               delete recordedResponse.body64
-            @responses[filename] = recordedResponse unless @options.alwaysLoadFixtures
+            @responses[filename] = recordedResponse if @options.cacheFixtures
             @_playbackRecordedResponse req, res, recordedResponse
           catch e
             console.log "Error loading #{filename}: #{e}"
