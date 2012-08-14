@@ -27,19 +27,34 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
 
   # if specified, load request simulator script
   loadSimulator: (simulatorPath) ->
-    console.log "  Simulator: #{simulatorPath || 'none'}"
-    if simulatorPath
-      try
-        @simulator = new simulator.RequestSimulator()
 
+    if simulatorPath
+      simulatorPath = path.resolve simulatorPath
+      simulatorPathRelative = path.relative ".", simulatorPath
+
+      if !fs.existsSync simulatorPath
+        console.error "Simulator #{simulatorPath} does not exist" 
+        process.exit 1
+
+      if !fs.statSync(simulatorPath).isFile()
+        console.error "Simulator #{simulatorPath} must be a javascript file" 
+        process.exit 1
+        
+      @simulator = new simulator.RequestSimulator({simulatorPath})
+
+      try
         # load the simulator script
         # the script should make register() calls on the passed-in simulator object
         require(simulatorPath)(@simulator)
-        console.log "             loaded successfully with #{@simulator.router.routes.length} rules"
+        console.log "  Simulator: #{simulatorPathRelative}"
+        console.log "             loaded with #{@simulator.router.routes.length} rules"
       catch e
         # continue gracefully if the simulator file has errors
+        console.log   "  Simulator: #{simulatorPathRelative}"
         console.error "             #{e}"
 
+    else
+      console.log "  Simulator: none"
   # Called once for each request that comes into the HTTP server.
   playbackRequest: (req, res) ->
     @requestReceivedAt = (new Date()).getTime()

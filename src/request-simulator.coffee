@@ -1,5 +1,6 @@
 barista    = require "barista"
 fs         = require "fs"
+path       = require "path"
 handlebars = require "handlebars"
 
 #
@@ -10,6 +11,7 @@ handlebars = require "handlebars"
 exports.RequestSimulator = class RequestSimulator
   constructor: (@options = {}) ->
     @router = new barista.Router
+    @simulatorPath = @options.simulatorPath # to locate templates at relative path to the simulator script
     @templates = {}
 
   # register()
@@ -20,12 +22,23 @@ exports.RequestSimulator = class RequestSimulator
   #   method      : http method, e.g. 'GET', optional, defaults to 'GET'
   #   dataHandler : callback function that can pre-process data before it is
   #                 applied to the template, optional, defauls to null
-  register: (path, template, method, dataHandler) ->
-    if not path or not template
+  register: (pathName, template, method, dataHandler) ->
+    if not pathName or not template
       console.error "register() must be called with a path and a template"
       process.exit 1
-    @router.match(path, method or "GET").to "",
-      path: path
+
+    template = path.resolve(@simulatorPath, "..", template)
+
+    if !fs.existsSync template
+      console.error "Template #{template} does not exist" 
+      process.exit 1
+
+    if !fs.statSync(template).isFile()
+      console.error "Template #{template} must be a file" 
+      process.exit 1
+
+    @router.match(pathName, method or "GET").to "",
+      path: pathName
       template: template
       dataHandler: dataHandler
 
