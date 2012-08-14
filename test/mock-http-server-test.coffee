@@ -185,7 +185,7 @@ createPlaybackServer playbackServerOptions
 playbackServerWithSimulatedRequestsOptions =
   port: PLAYBACKPORT2         # port to listen on
   fixtures: 'test/fixtures'   # directory where the fixture files are
-  simulator:'../test/simulator/test.js'   # test simulator script
+  simulator:'test/simulator/test.js'   # test simulator script
   hideUnknownRequests: true   # do not show them on screen during testing
 createPlaybackServer playbackServerWithSimulatedRequestsOptions
 
