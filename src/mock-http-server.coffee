@@ -1,6 +1,8 @@
 http          = require 'http'
 https         = require 'https'
 url           = require 'url'
+fs            = require 'fs'
+path          = require 'path'
 crypto        = require 'crypto'
 querystring   = require 'querystring'
 recording     = require '../src/recording-proxy'
@@ -25,7 +27,16 @@ exports.createPlaybackServer = (options) ->
   server
 
 exports._generateFixturesPath = (fixtures) ->
-  return if fixtures[0] == '/' then fixtures else "#{__dirname}/../#{fixtures}"
+  fixtures = path.resolve(fixtures)
+  if !fs.existsSync(fixtures)
+    console.error "Fixtures path #{fixtures} does not exist" 
+    process.exit 1
+
+  if !fs.statSync(fixtures).isDirectory()
+    console.error "Fixtures path #{fixtures} must be a directory" 
+    process.exit 1
+
+  return path.resolve(fixtures)
 
 exports._generateResponseFilename = (req, hash) ->
   requestPath = url.parse(req.url)
