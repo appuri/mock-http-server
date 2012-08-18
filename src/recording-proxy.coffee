@@ -49,7 +49,7 @@ exports.RecordingProxy = class RecordingProxy
           if isLocalHost(req.headers.host)
             logErrorToConsole "localhost used without --record=target"
           else
-            target = req.headers.host 
+            target = req.headers.host
         else
           logErrorToConsole "no host in request"
 
@@ -77,6 +77,8 @@ exports.RecordingProxy = class RecordingProxy
         firstSentAt: (new Date()).getTime()
 
       delete outgoing.headers.host if isLocalHost(outgoing.headers?.host)
+      delete outgoing.headers['Connection']
+      delete outgoing.headers['connection']
 
       # Issue request to target
       sendOutgoingRequest = ->
