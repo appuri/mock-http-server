@@ -76,6 +76,7 @@ exports.RecordingProxy = class RecordingProxy
 
       delete outgoing.headers.host if isLocalHost(outgoing.headers?.host)
       delete outgoing.headers['Connection']
+      delete outgoing.headers['connection']
 
       # Issue request to target
       sendOutgoingRequest = ->
