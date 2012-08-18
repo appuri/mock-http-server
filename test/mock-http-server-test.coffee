@@ -85,6 +85,8 @@ respondToGETRequest = (req, res) ->
       hostname = req.headers.host.split(':')[0]
       res.writeHead 200, "Content-Type": "text/plain"
       res.write hostname
+    when '/invalid-response'
+      res.socket.end('not a valid HTTP response on the response socket')
     else
       writeUnknownRequest res
   res.end()
@@ -437,6 +439,10 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
   #
   # Special tests
   #
+  .addBatch
+    'Getting an unparseable response': testGET PROXYPORT, '/invalid-response', 400
+  .addBatch
+    'Playing back an unparseable response': testGET PLAYBACKPORT, '/invalid-response', 400
   .addBatch
     'Sending a request to a mock throttled server': testGET THROTTLEPORT, '/throttle', 200
 
