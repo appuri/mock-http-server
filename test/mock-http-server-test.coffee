@@ -80,7 +80,12 @@ respondToGETRequest = (req, res) ->
       assert.equal req.url, TEST_LARGE_PATH
       res.writeHead 200, "Content-Type": "text/plain"
     when '/1secdelay'
-      setTimeout((-> res.writeHead 200), 1000)
+      res.keepOpen = true
+      delay = ->
+        res.writeHead 200, "Content-Type": "application/json"
+        res.write JSON.stringify({ delay: true })
+        res.end()
+      setTimeout(delay, 1000)
     when '/checkhost'
       hostname = req.headers.host.split(':')[0]
       res.writeHead 200, "Content-Type": "text/plain"
@@ -89,7 +94,7 @@ respondToGETRequest = (req, res) ->
       res.socket.end('not a valid HTTP response on the response socket')
     else
       writeUnknownRequest res
-  res.end()
+  res.end() unless res.keepOpen
 
 respondToPOSTRequest = (req, res) ->
   switch req.url
@@ -208,8 +213,9 @@ createRecordingProxyServer throttlingProxyOptions
 # Test Macros
 #
 
-getRawRequest = (port, path, callback, encoding) ->
+getRawRequest = (port, path, callback, encoding, opts) ->
   options = requestOptions(HOSTNAME, port, path)
+  _.extend(options, opts) if opts
   http.request(options, responseWrapper(callback, encoding)).end()
   return
 
@@ -239,13 +245,13 @@ testImage = (port, path, statusCode, vows) ->
 testPOST = (port, path, params, statusCode, vows = {}) ->
   topic = -> postRequest port, path, params, @callback
   testRequest topic, statusCode, vows
-testMGET = (port, path, requests, vows) ->
+testMGET = (port, path, requests, options, vows) ->
   test = {
     topic: ->
       callback = @callback
       error = null
       results = []
-      outstandingRequests = 0      
+      outstandingRequests = 0
       countdownLatch = (err, res) ->
         if err
           error = err
@@ -256,7 +262,7 @@ testMGET = (port, path, requests, vows) ->
           callback(error, results)
       addOutstandingRequest = ->
         outstandingRequests++
-        getRequest port, path, countdownLatch
+        getRawRequest port, path, countdownLatch, 'utf8', options
       i = 0
       while i < requests
         addOutstandingRequest()
@@ -323,7 +329,6 @@ testGEThost = (port) ->
     'should return results for the second host': ({secondhost}) ->
       assert.equal secondhost.body.toString('utf8'), 'secondhost'
   }
-
 
 #
 # Parameterized Batch
@@ -398,7 +403,21 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
-    'Sending many requests to a server': testMGET(PROXYPORT, '/1secdelay', 250,
+    'Sending many requests to a server': testMGET(PROXYPORT, '/1secdelay', 5, {},
+      'should return without error': (error, results) ->
+        assert.isNull error
+        for result in results
+          assert.equal result.statusCode, 200
+    )
+  .addBatch
+    'Sending many requests to a server with no connection pooling': testMGET(HTTPPORT, '/texttest', 100, {headers: {'Connection': 'close'}},
+      'should return without error': (error, results) ->
+        assert.isNull error
+        for result in results
+          assert.equal result.statusCode, 200
+    )
+  .addBatch
+    'Recording many requests to a server with no connection pooling': testMGET(PROXYPORT, '/texttest', 100, {headers: {'Connection': 'close'}},
       'should return without error': (error, results) ->
         assert.isNull error
         for result in results
@@ -426,16 +445,17 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
-    "Getting an unrecorded, simulated page from the playback server with simulated requests": testGET(PLAYBACKPORT2, '/product/300/user/user1', 200,
+    'Getting an unrecorded, simulated page from the playback server with simulated requests': testGET(PLAYBACKPORT2, '/product/300/user/user1', 200,
       'should respond with JSON data': (results) ->
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { product:'bacon', userid: 1234 }
     )
-    "Getting another unrecorded, simulated page from the playback server with simulated requests": testGET(PLAYBACKPORT2, '/product/3000/user/user123', 200,
+    'Getting another unrecorded, simulated page from the playback server with simulated requests': testGET(PLAYBACKPORT2, '/product/3000/user/user123', 200,
       'should respond with JSON data': (results) ->
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { product:'unknown product 3000', userid: -1 }
     )
+
   #
   # Special tests
   #
