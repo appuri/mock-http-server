@@ -79,13 +79,13 @@ respondToGETRequest = (req, res) ->
     when '/large'
       assert.equal req.url, TEST_LARGE_PATH
       res.writeHead 200, "Content-Type": "text/plain"
-    when '/delay'
+    when '/1secdelay'
       res.keepOpen = true
       delay = ->
         res.writeHead 200, "Content-Type": "application/json"
         res.write JSON.stringify({ delay: true })
         res.end()
-      setTimeout(delay, 10)
+      setTimeout(delay, 1000)
     when '/checkhost'
       hostname = req.headers.host.split(':')[0]
       res.writeHead 200, "Content-Type": "text/plain"
@@ -407,7 +407,21 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
-    'Sending many requests to a server': testMGET(PROXYPORT, '/delay', 100, {},
+    'Sending many requests to a server': testMGET(PROXYPORT, '/1secdelay', 5, {},
+      'should return without error': (error, results) ->
+        assert.isNull error
+        for result in results
+          assert.equal result.statusCode, 200
+    )
+  .addBatch
+    'Sending many requests to a server with no connection pooling': testMGET(HTTPPORT, '/texttest', 100, {headers: {'Connection': 'close'}},
+      'should return without error': (error, results) ->
+        assert.isNull error
+        for result in results
+          assert.equal result.statusCode, 200
+    )
+  .addBatch
+    'Recording many requests to a server with no connection pooling': testMGET(PROXYPORT, '/texttest', 100, {headers: {'Connection': 'close'}},
       'should return without error': (error, results) ->
         assert.isNull error
         for result in results

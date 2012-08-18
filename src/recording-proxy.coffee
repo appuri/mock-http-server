@@ -49,7 +49,7 @@ exports.RecordingProxy = class RecordingProxy
           if isLocalHost(req.headers.host)
             logErrorToConsole "localhost used without --record=target"
           else
-            target = req.headers.host
+            target = req.headers.host 
         else
           logErrorToConsole "no host in request"
 
