@@ -94,6 +94,11 @@ exports.RecordingProxy = class RecordingProxy
 
             if (error.code == 'ECONNRESET' or error.code == 'HPE_INVALID_CONSTANT') and resendOutgoingRequest()
               return # the request will be reissued after a delay
+            else if error.code == 'HPE_INVALID_CONSTANT'
+              response =
+                statusCode: 400
+                headers: { 'Content-Type': 'text/html' }
+                body: '<html><head></head>Bad Request</html>'
             else
               unless self.options.quietMode
                 console.error "HTTP Error"
