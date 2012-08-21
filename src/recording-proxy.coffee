@@ -10,6 +10,9 @@ url         = require 'url'
 querystring = require 'querystring'
 request     = require 'request'
 mock        = require '../src/mock-http-server'
+http        = require 'http'
+
+http.globalAgent.maxSockets = 1
 
 RETRY_TIMEOUT     = 30000 # Time in seconds before responding to original request
 RETRY_MAX_BACKOFF = 3000  # Max time in seconds to randomize request retry
@@ -96,11 +99,6 @@ exports.RecordingProxy = class RecordingProxy
 
             if (error.code == 'ECONNRESET' or error.code == 'HPE_INVALID_CONSTANT') and resendOutgoingRequest()
               return # the request will be reissued after a delay
-            else if error.code == 'HPE_INVALID_CONSTANT'
-              response =
-                statusCode: 400
-                headers: { 'Content-Type': 'text/html' }
-                body: '<html><head></head>Bad Request</html>'
             else
               unless self.options.quietMode
                 console.error "HTTP Error"
