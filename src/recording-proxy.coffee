@@ -12,7 +12,6 @@ request     = require 'request'
 mock        = require '../src/mock-http-server'
 http        = require 'http'
 
-console.log "FIX 1"
 http.globalAgent.maxSockets = 1
 
 RETRY_TIMEOUT     = 30000 # Time in seconds before responding to original request
@@ -36,8 +35,9 @@ exports.RecordingProxy = class RecordingProxy
       filepath = "#{self.fixturesPath}/#{req.filename}"
 
       logErrorToConsole = (error) ->
-        console.log "Error with request #{req.method} #{req.url} to #{filepath}"
-        console.log error
+        unless self.options.quietMode
+          console.error "Error with request #{req.method} #{req.url} to #{filepath}"
+          console.error error
         res.writeHead 500, "Content-Type": "text/plain"
         res.write error.toString()
         res.end()
@@ -77,6 +77,7 @@ exports.RecordingProxy = class RecordingProxy
         body: req.body
         encoding: null
         jar: false
+        firstSentAt: (new Date()).getTime()
 
       delete outgoing.headers.host if isLocalHost(outgoing.headers?.host)
       delete outgoing.headers['Connection']
@@ -90,27 +91,22 @@ exports.RecordingProxy = class RecordingProxy
             resendOutgoingRequest = ->
               timeNow = (new Date()).getTime()
               randomDelay = Math.random() * self.retryMaxBackoff
-              retryTime = timeNow - outgoing.sentAt + randomDelay
+              retryTime = timeNow - outgoing.firstSentAt + randomDelay
               timedOut = retryTime > self.retryTimeout
               return false if timedOut
               setTimeout(sendOutgoingRequest, randomDelay)
               return true
 
-            if error.code == 'ECONNRESET' and resendOutgoingRequest()
+            if (error.code == 'ECONNRESET' or error.code == 'HPE_INVALID_CONSTANT') and resendOutgoingRequest()
               return # the request will be reissued after a delay
-            else if error.code == 'HPE_INVALID_CONSTANT'
-              console.log "Cannot parse response to #{outgoing.uri}.  Returning 400 Bad Request."
-              response =
-                statusCode: 400
-                headers: { 'Content-Type': 'text/html' }
-                body: '<html><head></head>Bad Request</html>'
             else
-              console.log "HTTP Error"
-              console.log outgoing
-              console.log "response"
-              console.log response
-              console.log "body"
-              console.log body
+              unless self.options.quietMode
+                console.error "HTTP Error"
+                console.error outgoing
+                console.error "response"
+                console.error response
+                console.error "body"
+                console.error body
               return logErrorToConsole(error)
 
           # Remove HTTP 1.1 headers for HTTP 1.0

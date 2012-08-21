@@ -171,6 +171,9 @@ recordingProxyOptions =
   port: PROXYPORT                     # port to listen on
   fixtures: 'test/fixtures'           # directory where the fixture files are
   target: "#{HOSTNAME}:#{HTTPPORT}"   # target server to proxy
+  quietMode: true
+  retryTimeout: 1000
+  retryMaxBackoff: 100
 createRecordingProxyServer recordingProxyOptions
 
 #
@@ -205,6 +208,7 @@ throttlingProxyOptions =
   port: THROTTLEPORT                  # port to listen on
   fixtures: 'test/fixtures'           # directory where the fixture files are
   target: "#{HOSTNAME}:#{ECONNRESETPORT}"   # target will throttle requests
+  quietMode: true
   retryTimeout: 1000
   retryMaxBackoff: 100
 createRecordingProxyServer throttlingProxyOptions
@@ -403,7 +407,7 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
-    'Sending many requests to a server': testMGET(PROXYPORT, '/1secdelay', 5, {},
+    'Sending many requests to a server': testMGET(PROXYPORT, '/texttest', 100, {},
       'should return without error': (error, results) ->
         assert.isNull error
         for result in results
@@ -460,9 +464,9 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
   # Special tests
   #
   .addBatch
-    'Getting an unparseable response': testGET PROXYPORT, '/invalid-response', 400
+    'Getting an unparseable response will retry and return': testGET PROXYPORT, '/invalid-response', 500
   .addBatch
-    'Playing back an unparseable response': testGET PLAYBACKPORT, '/invalid-response', 400
+    'Getting an unparseable response will not be recorded': testGET PLAYBACKPORT, '/invalid-response', 404
   .addBatch
     'Sending a request to a mock throttled server': testGET THROTTLEPORT, '/throttle', 200
 
