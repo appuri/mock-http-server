@@ -15,7 +15,14 @@ users = for line in lines
 
 # Make requests to determine userID from user
 outstandingRequests = 0
-userMap = {}
+
+userMap = JSON.parse(fs.readFileSync('users.json'))
+
+file = fs.readFileSync('users-no-account.txt')
+lines = file.toString().split("\n")
+invalidUsers = {}
+for line in lines
+  invalidUsers[line] = true
 
 requestUserInfo = (username) ->
   writeFile = ->
@@ -45,8 +52,11 @@ requestUserInfo = (username) ->
         console.error " body: #{body}"
         console.error " Error: #{error}"
       writeFile()
-  outstandingRequests++
-  requestUserID(username)
+  if userMap[user] or invalidUsers[user]
+    # User found!
+  else
+    outstandingRequests++
+    requestUserID(username)
 
 console.error "Starting requests"
 for user in users
