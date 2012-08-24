@@ -145,8 +145,8 @@ Here the simulator registers for a path with format `/users/:user_id`. When a re
 
 Notes:
 
-* Only `url.pathname` (e.g. `/path/here` from `http://somehost.com:9000/path/here?param1=blah`) is used for matching.
-* template path specified in simulator is relative to `` `pwd` ``
+* Do not specify query params in the path format. All query params from actual url will be available as variables in the template.
+* template path specified in simulator is relative to the simulator script
 
 ### Data transformation
 

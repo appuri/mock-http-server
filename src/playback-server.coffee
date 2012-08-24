@@ -140,7 +140,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
         # Try serving the request using the simulator
         if @simulator
           requestPath = url.parse(req.url)
-          pathname = path.normalize requestPath.pathname
+          pathname = path.normalize requestPath.path
           self = this
 
           # respondTo returns true if the simulator can handle the request
