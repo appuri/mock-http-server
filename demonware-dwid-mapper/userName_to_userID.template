@@ -1,0 +1,18 @@
+{
+  "filepath": "GET--mw3-xbox-users-userName-MedusaFiedel682-count-100-page-1-mw3-xbox-webzone-demonware-net.response",
+  "fileversion": 2,
+  "method": "GET",
+  "target": "http://mw3-xbox-webzone.demonware.net",
+  "uri": "http://mw3-xbox-webzone.demonware.net/mw3/xbox/users/?userName=MedusaFiedel682&count=100&page=1",
+  "statusCode": 200,
+  "headers": {
+    "expires": "Fri, 24 Aug 2012 17:48:58 GMT",
+    "content-type": "application/json",
+    "transfer-encoding": "chunked",
+    "date": "Fri, 24 Aug 2012 16:48:58 GMT",
+    "server": "lighttpd/1.4.31"
+  },
+  "host": "mw3-xbox-webzone.demonware.net",
+  "latency": 764,
+  "body": "{\"previous\": null, \"data\": [{\"userName\": \"{{userName}}\", \"mappedUserName\": \"{{mappedUserName}}\", \"reputation\": 0, \"userID\": {{userID}}}}], \"page\": 1, \"next\": null}"
+}
