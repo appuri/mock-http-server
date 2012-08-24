@@ -8,7 +8,8 @@
     "optimist": "= 0.3.4",
     "request": "= 2.9.202",
     "barista": "= 0.0.5",
-    "handlebars": "= 1.0.6"
+    "handlebars": "= 1.0.6",
+    "xtend": "= 1.0.3"
   },
   "devDependencies": {
     "vows": "= 0.6.2"

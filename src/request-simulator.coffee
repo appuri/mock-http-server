@@ -2,6 +2,8 @@ barista    = require "barista"
 fs         = require "fs"
 path       = require "path"
 handlebars = require "handlebars"
+url        = require "url"
+extend     = require "xtend"
 
 #
 # RequestSimulator
@@ -69,6 +71,11 @@ exports.RequestSimulator = class RequestSimulator
     match = @router.first(path, method or "GET")
 
     return false  unless match  # simulator will not handle this request
+
+    # add url query params to the available vars
+    url_parts = url.parse path, true
+    query = url_parts.query
+    extend(match, query)
 
     # get compiled template from cache
     template = @templates[match.template]
