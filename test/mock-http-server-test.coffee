@@ -80,14 +80,21 @@ respondToGETRequest = (req, res) ->
       assert.equal req.url, TEST_LARGE_PATH
       res.writeHead 200, "Content-Type": "text/plain"
     when '/1secdelay'
-      setTimeout((-> res.writeHead 200), 1000)
+      res.keepOpen = true
+      delay = ->
+        res.writeHead 200, "Content-Type": "application/json"
+        res.write JSON.stringify({ delay: true })
+        res.end()
+      setTimeout(delay, 1000)
     when '/checkhost'
       hostname = req.headers.host.split(':')[0]
       res.writeHead 200, "Content-Type": "text/plain"
       res.write hostname
+    when '/invalid-response'
+      res.socket.end('not a valid HTTP response on the response socket')
     else
       writeUnknownRequest res
-  res.end()
+  res.end() unless res.keepOpen
 
 respondToPOSTRequest = (req, res) ->
   switch req.url
@@ -164,6 +171,9 @@ recordingProxyOptions =
   port: PROXYPORT                     # port to listen on
   fixtures: 'test/fixtures'           # directory where the fixture files are
   target: "#{HOSTNAME}:#{HTTPPORT}"   # target server to proxy
+  quietMode: true
+  retryTimeout: 1000
+  retryMaxBackoff: 100
 createRecordingProxyServer recordingProxyOptions
 
 #
@@ -198,6 +208,7 @@ throttlingProxyOptions =
   port: THROTTLEPORT                  # port to listen on
   fixtures: 'test/fixtures'           # directory where the fixture files are
   target: "#{HOSTNAME}:#{ECONNRESETPORT}"   # target will throttle requests
+  quietMode: true
   retryTimeout: 1000
   retryMaxBackoff: 100
 createRecordingProxyServer throttlingProxyOptions
@@ -206,8 +217,9 @@ createRecordingProxyServer throttlingProxyOptions
 # Test Macros
 #
 
-getRawRequest = (port, path, callback, encoding) ->
+getRawRequest = (port, path, callback, encoding, opts) ->
   options = requestOptions(HOSTNAME, port, path)
+  _.extend(options, opts) if opts
   http.request(options, responseWrapper(callback, encoding)).end()
   return
 
@@ -237,13 +249,13 @@ testImage = (port, path, statusCode, vows) ->
 testPOST = (port, path, params, statusCode, vows = {}) ->
   topic = -> postRequest port, path, params, @callback
   testRequest topic, statusCode, vows
-testMGET = (port, path, requests, vows) ->
+testMGET = (port, path, requests, options, vows) ->
   test = {
     topic: ->
       callback = @callback
       error = null
       results = []
-      outstandingRequests = 0      
+      outstandingRequests = 0
       countdownLatch = (err, res) ->
         if err
           error = err
@@ -254,7 +266,7 @@ testMGET = (port, path, requests, vows) ->
           callback(error, results)
       addOutstandingRequest = ->
         outstandingRequests++
-        getRequest port, path, countdownLatch
+        getRawRequest port, path, countdownLatch, 'utf8', options
       i = 0
       while i < requests
         addOutstandingRequest()
@@ -321,7 +333,6 @@ testGEThost = (port) ->
     'should return results for the second host': ({secondhost}) ->
       assert.equal secondhost.body.toString('utf8'), 'secondhost'
   }
-
 
 #
 # Parameterized Batch
@@ -396,7 +407,21 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
-    'Sending many requests to a server': testMGET(PROXYPORT, '/1secdelay', 250,
+    'Sending many requests to a server': testMGET(PROXYPORT, '/texttest', 100, {},
+      'should return without error': (error, results) ->
+        assert.isNull error
+        for result in results
+          assert.equal result.statusCode, 200
+    )
+  .addBatch
+    'Sending many requests to a server with no connection pooling': testMGET(HTTPPORT, '/texttest', 100, {headers: {'Connection': 'close'}},
+      'should return without error': (error, results) ->
+        assert.isNull error
+        for result in results
+          assert.equal result.statusCode, 200
+    )
+  .addBatch
+    'Recording many requests to a server with no connection pooling': testMGET(PROXYPORT, '/texttest', 100, {headers: {'Connection': 'close'}},
       'should return without error': (error, results) ->
         assert.isNull error
         for result in results
@@ -424,19 +449,24 @@ vows.describe('Mock HTTP Server Test (mock-http-server-test)')
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { secure: true }
     )
-    "Getting an unrecorded, simulated page from the playback server with simulated requests": testGET(PLAYBACKPORT2, '/product/300/user/user1', 200,
+    'Getting an unrecorded, simulated page from the playback server with simulated requests': testGET(PLAYBACKPORT2, '/product/300/user/user1', 200,
       'should respond with JSON data': (results) ->
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { product:'bacon', userid: 1234 }
     )
-    "Getting another unrecorded, simulated page from the playback server with simulated requests": testGET(PLAYBACKPORT2, '/product/3000/user/user123', 200,
+    'Getting another unrecorded, simulated page from the playback server with simulated requests': testGET(PLAYBACKPORT2, '/product/3000/user/user123', 200,
       'should respond with JSON data': (results) ->
         assert.equal results.headers['content-type'], "application/json"
         assert.deepEqual JSON.parse(results.body), { product:'unknown product 3000', userid: -1 }
     )
+
   #
   # Special tests
   #
+  .addBatch
+    'Getting an unparseable response will retry and return': testGET PROXYPORT, '/invalid-response', 500
+  .addBatch
+    'Getting an unparseable response will not be recorded': testGET PLAYBACKPORT, '/invalid-response', 404
   .addBatch
     'Sending a request to a mock throttled server': testGET THROTTLEPORT, '/throttle', 200
 

@@ -105,9 +105,11 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
     if headers['connection']
       delete headers['connection']
 
-    currentTime = (new Date()).getTime()
-    waitForLatency = latency - (currentTime - @requestReceivedAt)
-    waitForLatency = 0 if waitForLatency < 0
+    waitForLatency = 0
+    if @options.latencyEnabled?
+      currentTime = (new Date()).getTime()
+      waitForLatency = latency - (currentTime - @requestReceivedAt)
+      waitForLatency = 0 if waitForLatency < 0
 
     setTimeout -> 
       res.writeHead statusCode, headers
@@ -140,7 +142,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
         # Try serving the request using the simulator
         if @simulator
           requestPath = url.parse(req.url)
-          pathname = path.normalize requestPath.pathname
+          pathname = path.normalize requestPath.path
           self = this
 
           # respondTo returns true if the simulator can handle the request
