@@ -38,6 +38,8 @@ help = ->
            store files relative to cwd (default ./#{DEFAULT_FIXTURES})
       --simulator=file
            request simulator script
+      --latency
+           Simulate latency in playback mode
     
     
     Usage:
@@ -92,8 +94,9 @@ if not port? || port == 0
 fixtures = argv.fixtures || DEFAULT_FIXTURES
 simulator = argv.simulator
 record = argv.record
+latencyEnabled = argv.latency
 
-options = { bind, port, fixtures, simulator }
+options = { bind, port, fixtures, simulator, latencyEnabled }
 if record?
   console.log "Running in recording mode"
   if record == true
