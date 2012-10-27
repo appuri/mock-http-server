@@ -92,6 +92,11 @@ respondToGETRequest = (req, res) ->
       res.write hostname
     when '/invalid-response'
       res.socket.end('not a valid HTTP response on the response socket')
+    when '/expires'
+      headers =
+        "Content-Type": "text/plain",
+        "Expires": (new Date(Date.now() + 60000))
+      res.writeHead 200, headers
     else
       writeUnknownRequest res
   res.end() unless res.keepOpen
@@ -334,6 +339,11 @@ testGEThost = (port) ->
       assert.equal secondhost.body.toString('utf8'), 'secondhost'
   }
 
+testGETExpires = (port) -> 
+  testGET port, '/expires', 200,
+    'should have expires header': (results) ->
+      assert.isTrue results.headers['expires']?
+
 #
 # Parameterized Batch
 #
@@ -353,6 +363,7 @@ createTestBatch = (name, port) ->
   test["Getting a large path the #{name} server"] = testGET port, TEST_LARGE_PATH, 200
   test["Posting to an unknown page on the #{name} server"] = testPOSTUnknown port
   test["Posting JSON to the #{name} server"] = testPOSTJSON port
+  test["Getting an expires header from the #{name} server"] = testGETExpires port
   test
 
 #

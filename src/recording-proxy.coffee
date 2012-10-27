@@ -124,6 +124,7 @@ exports.RecordingProxy = class RecordingProxy
             host: outgoing?.headers?.host
             latency: (new Date()).getTime() - outgoing.sentAt
           recordingData.body64 = response.body.toString('base64') if response.body
+          recordingData.expiresOffset = ((new Date(response.headers.expires)) - Date.now()) if response.headers.expires
 
           recordingJSON = JSON.stringify(recordingData, true, 2)
           fs.writeFile filepath, recordingJSON, (error) ->

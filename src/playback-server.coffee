@@ -98,12 +98,15 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
   # in the original chunks sent from the client
   # encoded into base64 for serialization
   _playbackRecordedResponse: (req, res, recordedResponse) ->
-    { statusCode, headers, body, latency } = recordedResponse
+    { statusCode, headers, body, latency, expiresOffset } = recordedResponse
     
     # avoid massive perf problems with connection header set to anything
     # but 'keep-alive'
     if headers['connection']
       delete headers['connection']
+
+    if expiresOffset?
+      headers['expires'] = (new Date(Date.now() + expiresOffset))
 
     waitForLatency = 0
     if @options.latencyEnabled?
