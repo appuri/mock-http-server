@@ -106,7 +106,8 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
       delete headers['connection']
 
     if expiresOffset?
-      headers['expires'] = (new Date(Date.now() + expiresOffset))
+      headers['date'] = (new Date(Date.now())).toUTCString()
+      headers['expires'] = (new Date(Date.now() + expiresOffset)).toUTCString()
 
     waitForLatency = 0
     if @options.latencyEnabled?
