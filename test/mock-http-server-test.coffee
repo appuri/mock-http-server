@@ -17,7 +17,7 @@ helpers   = require '../test/helpers'
 mock      = require '../src/mock-http-server'
 net       = require 'net'
 
-{responseWrapper, testHTTPRunning, requestOptions, postJSONOptions, serialTest} = helpers
+{responseWrapper, testHTTPRunning, requestOptions, postJSONOptions, serialTest, sendRawHttpRequest} = helpers
 {createRecordingProxyServer, createPlaybackServer} = mock
 
 HOSTNAME        = '127.0.0.1'
@@ -344,6 +344,23 @@ testGETExpires = (port) ->
     'should have expires header': (results) ->
       assert.isTrue results.headers['expires']?
 
+testProxyHost = (port) ->
+  return {
+    topic: ->
+      callback = @callback
+      host = 'www.test.host.abc'
+      path = '/hosttest'
+      sendRawHttpRequest({port, host, path}, callback)
+      return
+    'view results': (results...) -> console.log ">>> results", results...
+    'should return status OK': ({statusCode}) ->
+      assert.equal statusCode, 200
+    'should return host in response': ({response}) ->
+      match = response.match(/Host: (.*)\r\n/gm)
+      assert.isTrue match?, "match should be valid"
+      assert.equal match[1], host
+  }
+
 #
 # Parameterized Batch
 #
@@ -364,6 +381,7 @@ createTestBatch = (name, port) ->
   test["Posting to an unknown page on the #{name} server"] = testPOSTUnknown port
   test["Posting JSON to the #{name} server"] = testPOSTJSON port
   test["Getting an expires header from the #{name} server"] = testGETExpires port
+  test["Using the hostname in the request to the #{name} server"] = testProxyHost port
   test
 
 #

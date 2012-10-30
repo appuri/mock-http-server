@@ -1,4 +1,5 @@
 http        = require 'http'
+net         = require 'net'
 assert      = require 'assert'
 querystring = require 'querystring'
 
@@ -76,3 +77,16 @@ serialTest = exports.serialTest = (spec) ->
   next null
   return
 
+sendRawHttpRequest = exports.sendRawHttpRequest = (options, callback) ->
+  {port, host, path} = options
+  response = ''
+  socket = net.connect port, () -> socket.write("GET http://#{host}#{path} HTTP/1.1\r\nHost: #{host}\r\nAccept: */*\r\n\r\n")
+  socket.on 'data', (data) ->
+    response += data
+    socket.end()
+  socket.on 'end', () ->
+    httpRegex = /HTTP\/[0-9.]+ ([0-9]+) /gm
+    match = httpRegex.exec(response)
+    statusCode = match?[1]
+    callback(null, { statusCode, response })
+  socket.setEncoding()
