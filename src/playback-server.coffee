@@ -137,6 +137,7 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
               recordedResponse.body = new Buffer(recordedResponse.body64, 'base64')
               delete recordedResponse.body64
             @responses[filename] = recordedResponse if @options.cacheFixtures
+            delete @notfound[filename]
             @_playbackRecordedResponse req, res, recordedResponse
           catch e
             console.log "Error loading #{filename}: #{e}"
@@ -167,14 +168,10 @@ exports.PlaybackServer = class PlaybackServer extends events.EventEmitter
   # Determines if request is not recorded or in the cache
   # before loading it from a file.
   _playbackResponseFromFilename: (req, res, filename, fileversion) ->
-    if @notfound[filename]
-      # We've already had this request but do not have a recorded response
-      @_respondWithNotFound req, res, filename
+    # Get file contents out of cache unless options have it turned off
+    recordedResponse = @responses[filename]
+    if recordedResponse
+      @_playbackRecordedResponse req, res, recordedResponse
     else
-      # Get file contents out of cache unless options have it turned off
-      recordedResponse = @responses[filename]
-      if recordedResponse
-        @_playbackRecordedResponse req, res, recordedResponse
-      else
-        @_playbackResponseFromFile req, res, filename, fileversion
+      @_playbackResponseFromFile req, res, filename, fileversion
 

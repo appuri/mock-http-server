@@ -97,6 +97,9 @@ respondToGETRequest = (req, res) ->
         "Content-Type": "text/plain",
         "Expires": (new Date(Date.now() + 60000))
       res.writeHead 200, headers
+    when '/hosttest', 'http://www.test.host.abc/hosttest'
+      res.writeHead 200, "Content-Type": "text/plain"
+      res.write "Host: #{req.headers.host}" if req.headers.host?
     else
       writeUnknownRequest res
   res.end() unless res.keepOpen
@@ -352,13 +355,13 @@ testProxyHost = (port) ->
       path = '/hosttest'
       sendRawHttpRequest({port, host, path}, callback)
       return
-    'view results': (results...) -> console.log ">>> results", results...
     'should return status OK': ({statusCode}) ->
       assert.equal statusCode, 200
     'should return host in response': ({response}) ->
-      match = response.match(/Host: (.*)\r\n/gm)
+      regex = /Host: (.*)$/gm
+      match = regex.exec(response)
       assert.isTrue match?, "match should be valid"
-      assert.equal match[1], host
+      assert.equal match[1], 'www.test.host.abc'
   }
 
 #
