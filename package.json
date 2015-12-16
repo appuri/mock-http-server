@@ -12,7 +12,7 @@
     "xtend": "= 1.0.3"
   },
   "devDependencies": {
-    "vows": "= 0.6.2"
+    "vows": "^0.8.1"
   },
   "scripts": {
     "test": "rm -f test/fixtures/*.response && vows --spec test/*-test.coffee",
